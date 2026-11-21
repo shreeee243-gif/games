@@ -46,7 +46,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
     return (
       <div
         role="status"
-        className="fixed bottom-4 right-4 z-40 w-[calc(100%-2rem)] max-w-sm rounded-md border border-[#3F4451] bg-[#14171E] p-3.5 shadow-2xl"
+        className="animate-stage-enter fixed bottom-4 right-4 z-40 w-[calc(100%-2rem)] max-w-sm rounded-md border border-[#3F4451] bg-[#14171E] p-3.5 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 font-mono text-xs font-semibold text-[#F59E0B]">
@@ -76,7 +76,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
     >
       {event.type === 'stuck-99' && (
-        <div className="w-full max-w-sm rounded-md border border-[#2C313C] bg-[#14161A] p-5 shadow-2xl">
+        <div className="animate-stage-enter w-full max-w-sm rounded-md border border-[#2C313C] bg-[#14161A] p-5 shadow-2xl">
           <div className="font-mono text-xs uppercase tracking-wider text-[#EF4444]">
             {event.headline}
           </div>
@@ -94,7 +94,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
               sound.click();
               onDismissRef.current('Fine, skipping the last 1%. Impatient human.');
             }}
-            className="mt-4 min-h-[42px] w-full rounded-md border border-[#3F4451] bg-[#1D2129] px-4 py-2 text-xs font-semibold text-[#F2F0EB] hover:border-[#EF4444]"
+            className="mt-4 min-h-[44px] w-full rounded-md border border-[#3F4451] bg-[#1D2129] px-4 py-2 text-xs font-semibold text-[#F2F0EB] transition-colors hover:border-[#EF4444] active:scale-[0.98]"
           >
             Kick Progress Bar
           </button>
@@ -102,7 +102,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
       )}
 
       {event.type === 'fake-crash' && (
-        <div className="w-full max-w-md rounded-md border-2 border-[#DC2626] bg-[#160B0D] p-5 font-mono shadow-2xl">
+        <div className="animate-stage-enter w-full max-w-md rounded-md border-2 border-[#DC2626] bg-[#160B0D] p-5 font-mono shadow-2xl">
           <div className="flex items-center gap-2 text-sm font-bold text-[#EF4444]">
             <AlertTriangle className="h-5 w-5" />
             {event.headline}
@@ -125,7 +125,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
       )}
 
       {event.type === 'meta-verify' && (
-        <div className="w-full max-w-sm rounded-md border border-[#3F4451] bg-[#14161A] p-5 shadow-2xl">
+        <div className="animate-stage-enter w-full max-w-sm rounded-md border border-[#3F4451] bg-[#14161A] p-5 shadow-2xl">
           <div className="font-mono text-xs uppercase tracking-wider text-[#F59E0B]">
             {event.headline}
           </div>
@@ -137,7 +137,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
                 sound.click();
                 onDismissRef.current('Suspicious denial recorded.');
               }}
-              className="min-h-[42px] flex-1 rounded-md border border-[#3F4451] bg-[#1D2129] px-3 py-2 text-xs font-semibold text-[#F2F0EB] hover:border-[#EF4444]"
+              className="min-h-[44px] flex-1 rounded-md border border-[#3F4451] bg-[#1D2129] px-3 py-2 text-xs font-semibold text-[#F2F0EB] transition-colors hover:border-[#EF4444] active:scale-[0.98]"
             >
               No, I am working
             </button>
@@ -147,7 +147,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
                 sound.click();
                 onDismissRef.current('Honesty respected. Returning to your torment.');
               }}
-              className="min-h-[42px] flex-1 rounded-md bg-[#DC2626] px-3 py-2 text-xs font-semibold text-white hover:bg-[#B91C1C]"
+              className="min-h-[44px] flex-1 rounded-md bg-[#DC2626] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#B91C1C] active:scale-[0.98]"
             >
               Yes, send help
             </button>
@@ -183,7 +183,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
               <button
                 type="button"
                 onClick={() => onDismissRef.current('You passed! Just kidding.')}
-                className="mt-4 min-h-[38px] rounded-md border border-[#DC2626]/60 bg-[#2A1215] px-4 py-1.5 text-xs font-semibold text-[#FCA5A5] hover:bg-[#DC2626] hover:text-white"
+                className="mt-4 min-h-[44px] rounded-md border border-[#DC2626]/60 bg-[#2A1215] px-4 py-1.5 text-xs font-semibold text-[#FCA5A5] transition-colors hover:bg-[#DC2626] hover:text-white active:scale-[0.98]"
               >
                 Ugh, Continue
               </button>

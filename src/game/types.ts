@@ -54,11 +54,19 @@ export interface ChaosEventState {
   cursorVariant?: 'duck' | 'warn';
 }
 
+export interface ChaosScheduleEntry {
+  triggerLevelIdx: number;
+  type: Exclude<ChaosEventType, 'cursor-swap'>;
+  cursorVariant?: 'duck' | 'warn';
+}
+
 export interface LevelComponentProps {
   levelMeta: LevelMeta;
   chaosLevel: number;
   levelAttempts: number;
   shuffleSeed: number;
+  runSeed: number;
+  isPaused: boolean;
   onSuccess: (customNote?: string) => void;
   onFail: (reason: string, consumeRetry?: boolean) => void;
   onSurrender?: () => void;

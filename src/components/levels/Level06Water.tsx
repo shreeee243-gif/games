@@ -100,7 +100,7 @@ export const Level06Water: React.FC<LevelComponentProps> = ({
                 </span>
               )}
               {isSelected && (
-                <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#DC2626] text-white shadow-md">
+                <span className="animate-pop absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#DC2626] text-white shadow-md">
                   <Check className="h-3.5 w-3.5 stroke-[3]" />
                 </span>
               )}

@@ -11,15 +11,33 @@ interface Ping {
 }
 
 export const Level05InvisibleObject: React.FC<LevelComponentProps> = ({
+  runSeed,
   onSuccess,
   onFail,
 }) => {
   const boxRef = useRef<HTMLButtonElement>(null);
-  const target = useMemo(() => ({ x: 68, y: 38 }), []);
+  const revealTimeoutRef = useRef<number | null>(null);
+  const target = useMemo(() => {
+    const spots = [
+      { x: 68, y: 38 },
+      { x: 30, y: 66 },
+      { x: 72, y: 68 },
+      { x: 32, y: 34 },
+    ];
+    return spots[Math.abs(runSeed) % spots.length];
+  }, [runSeed]);
   const [pings, setPings] = useState<Ping[]>([]);
   const [hint, setHint] = useState('Click anywhere in the dark void to locate the Invisible Bicycle.');
   const [revealed, setRevealed] = useState(false);
   const [misses, setMisses] = useState(0);
+
+  React.useEffect(() => {
+    return () => {
+      if (revealTimeoutRef.current !== null) {
+        window.clearTimeout(revealTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleVoidClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (revealed) return;
@@ -35,9 +53,9 @@ export const Level05InvisibleObject: React.FC<LevelComponentProps> = ({
 
     if (result.hit) {
       setRevealed(true);
-      setTimeout(() => {
+      revealTimeoutRef.current = window.setTimeout(() => {
         onSuccess('You actually found an invisible bicycle. Optometrists hate this trick.');
-      }, 650);
+      }, 600);
       return;
     }
 
@@ -65,12 +83,23 @@ export const Level05InvisibleObject: React.FC<LevelComponentProps> = ({
       <button
         ref={boxRef}
         type="button"
+        data-target-x={target.x}
+        data-target-y={target.y}
         onClick={handleVoidClick}
         aria-label="Dark void containing an invisible bicycle. Click to probe."
-        className="relative block h-64 w-full overflow-hidden rounded-md border border-[#2C313C] bg-[#0B0D11] text-left focus-visible:outline-2 focus-visible:outline-[#EF4444] sm:h-72"
+        className="relative block h-64 w-full touch-none select-none overflow-hidden rounded-md border border-[#2C313C] bg-[#0B0D11] text-left focus-visible:outline-2 focus-visible:outline-[#EF4444] sm:h-72"
       >
+        {/* Subtle tactical radar crosshair lines */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-25"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, rgba(148,163,184,0.14) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.14) 1px, transparent 1px)',
+            backgroundSize: '25% 25%',
+          }}
+        />
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="font-mono text-xs tracking-widest text-[#2E3442]">
+          <span className="font-mono text-xs tracking-widest text-[#333B4B]">
             [ 100% GENUINE INVISIBLE BICYCLE INSIDE ]
           </span>
         </div>

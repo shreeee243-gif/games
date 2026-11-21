@@ -1,15 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ALL_ENDING_IDS,
   LEVEL_METAS,
   MAX_RETRIES,
   TOTAL_LEVELS,
   buildShareText,
   calculateChaosLevel,
+  createRunEventSchedule,
   determineEnding,
   evaluateGridSelection,
   evaluateInvisibleHit,
   formatDuration,
+  generateCertificateCode,
   getChaosLabel,
   pickSnarkyMessage,
 } from './engine';
@@ -32,7 +35,7 @@ test('calculateChaosLevel scales monotonically with level and failures and clamp
   assert.equal(getChaosLabel(95), 'Sentient');
 });
 
-test('determineEnding maps accurately to all 5 required endings', () => {
+test('determineEnding maps accurately to all 5 required endings with realistic thresholds', () => {
   const base = {
     totalLevels: 12,
     attempts: 14,
@@ -55,7 +58,7 @@ test('determineEnding maps accurately to all 5 required endings', () => {
     determineEnding({
       ...base,
       levelsCleared: 12,
-      failedVerifications: 4,
+      failedVerifications: 3,
       elapsedSeconds: 180,
       victory: true,
     }).title,
@@ -66,8 +69,8 @@ test('determineEnding maps accurately to all 5 required endings', () => {
     determineEnding({
       ...base,
       levelsCleared: 12,
-      failedVerifications: 7,
-      elapsedSeconds: 320,
+      failedVerifications: 5,
+      elapsedSeconds: 260,
       victory: true,
     }).title,
     'CAPTCHA Victim',
@@ -106,6 +109,19 @@ test('determineEnding maps accurately to all 5 required endings', () => {
     }).title,
     'The CAPTCHA Has Won',
   );
+
+  assert.equal(ALL_ENDING_IDS.length, 5);
+});
+
+test('createRunEventSchedule varies by seed, covers all 5 chaos types, and never fires on Stage 1', () => {
+  const s1 = createRunEventSchedule(101);
+  const s2 = createRunEventSchedule(99991);
+  assert.equal(s1.length, 5);
+  assert.equal(new Set(s1.map((e) => e.type)).size, 5);
+  assert.ok(s1.every((e) => e.triggerLevelIdx >= 1 && e.triggerLevelIdx <= 10));
+  const sig1 = s1.map((e) => `${e.triggerLevelIdx}:${e.type}`).join(',');
+  const sig2 = s2.map((e) => `${e.triggerLevelIdx}:${e.type}`).join(',');
+  assert.notEqual(sig1, sig2);
 });
 
 test('evaluateGridSelection checks exact matches, missed items, and extra decoys', () => {
@@ -140,20 +156,23 @@ test('pickSnarkyMessage avoids repeating the immediately previous message', () =
   assert.notEqual(first, second);
 });
 
-test('formatDuration and buildShareText format failure card cleanly', () => {
+test('formatDuration, certificate code, and buildShareText format failure card cleanly', () => {
   assert.equal(formatDuration(125), '02:05');
   const stats = {
     levelsCleared: 12,
     totalLevels: 12,
     attempts: 18,
-    failedVerifications: 4,
+    failedVerifications: 3,
     elapsedSeconds: 142,
     finalChaos: 99,
     surrendered: false,
     victory: true,
   };
   const ending = determineEnding(stats);
+  const cert = generateCertificateCode(stats, ending.id);
+  assert.match(cert, /^CFH-SUS-\d{4}$/);
   const share = buildShareText(stats, ending);
+  assert.ok(share.includes(cert));
   assert.ok(share.includes('SUSPICIOUSLY HUMAN'));
   assert.ok(share.includes('02:22'));
   assert.ok(share.includes('TRY THIS. I DARE YOU.'));

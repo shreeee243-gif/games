@@ -191,13 +191,105 @@ export function determineEnding(stats: RunStats): EndingProfile {
     }
     return ENDINGS['definitely-a-robot'];
   }
-  if (stats.failedVerifications <= 2 && stats.elapsedSeconds <= 210) {
+  if (stats.failedVerifications <= 1 && stats.elapsedSeconds <= 210) {
     return ENDINGS['certified-human'];
   }
-  if (stats.failedVerifications <= 4) {
+  if (stats.failedVerifications <= 3) {
     return ENDINGS['suspiciously-human'];
   }
   return ENDINGS['captcha-victim'];
+}
+
+export function createRunEventSchedule(seed: number): import('./types').ChaosScheduleEntry[] {
+  const eventTypes: Array<Exclude<import('./types').ChaosEventType, 'cursor-swap'>> = [
+    'admin-message',
+    'stuck-99',
+    'fake-success',
+    'meta-verify',
+    'fake-crash',
+  ];
+
+  // Deterministic Fisher-Yates shuffle based on run seed so each run varies cleanly
+  let state = Math.abs(Math.floor(seed)) || 1337;
+  const nextRand = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+
+  for (let i = eventTypes.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(nextRand() * (i + 1));
+    [eventTypes[i], eventTypes[j]] = [eventTypes[j], eventTypes[i]];
+  }
+
+  // Pick 5 non-adjacent trigger stages between Level 3 (idx 2) and Level 11 (idx 10)
+  // Using alternating slots with seed jitter ensures no back-to-back modal fatigue
+  const slotSets = [
+    [2, 4, 6, 8, 10],
+    [1, 3, 5, 8, 10],
+    [2, 4, 7, 9, 10],
+    [1, 4, 6, 8, 10],
+  ];
+  const slots = slotSets[Math.floor(nextRand() * slotSets.length)];
+
+  return slots.map((triggerLevelIdx, idx) => ({
+    triggerLevelIdx,
+    type: eventTypes[idx],
+    cursorVariant: idx === 2 ? 'duck' : idx === 4 ? 'warn' : undefined,
+  }));
+}
+
+export function generateCertificateCode(stats: RunStats, endingId: EndingId): string {
+  const prefixMap: Record<EndingId, string> = {
+    'certified-human': 'HMN',
+    'suspiciously-human': 'SUS',
+    'captcha-victim': 'VIC',
+    'definitely-a-robot': 'BOT',
+    'captcha-has-won': 'OWN',
+  };
+  const hash =
+    ((stats.attempts * 97 + stats.elapsedSeconds * 31 + stats.finalChaos * 13 + stats.levelsCleared * 7) %
+      8999) +
+    1000;
+  return `CFH-${prefixMap[endingId]}-${hash}`;
+}
+
+const ENDINGS_STORAGE_KEY = 'captcha_from_hell_endings_v1';
+
+export const ALL_ENDING_IDS: EndingId[] = [
+  'certified-human',
+  'suspiciously-human',
+  'captcha-victim',
+  'definitely-a-robot',
+  'captcha-has-won',
+];
+
+export function loadUnlockedEndings(): EndingId[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(ENDINGS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is EndingId =>
+      ALL_ENDING_IDS.includes(id as EndingId),
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function recordUnlockedEnding(endingId: EndingId): EndingId[] {
+  const existing = loadUnlockedEndings();
+  if (existing.includes(endingId)) return existing;
+  const updated = [...existing, endingId];
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(ENDINGS_STORAGE_KEY, JSON.stringify(updated));
+    } catch {
+      // Ignore storage quota or privacy-mode errors
+    }
+  }
+  return updated;
 }
 
 export function evaluateGridSelection(
@@ -336,8 +428,9 @@ export function pickSnarkyMessage(
 
 export function buildShareText(stats: RunStats, ending: EndingProfile): string {
   const timeStr = formatDuration(stats.elapsedSeconds);
+  const cert = generateCertificateCode(stats, ending.id);
   return [
-    `CAPTCHA FROM HELL — Verdict: ${ending.title.toUpperCase()}`,
+    `CAPTCHA FROM HELL [${cert}] — Verdict: ${ending.title.toUpperCase()}`,
     `Cleared: ${stats.levelsCleared}/${stats.totalLevels} | Attempts: ${stats.attempts} | Failed: ${stats.failedVerifications}`,
     `Time: ${timeStr} | Peak Chaos: ${stats.finalChaos}%`,
     `"${ending.roast}"`,

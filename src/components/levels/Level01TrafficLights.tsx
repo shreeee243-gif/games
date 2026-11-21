@@ -77,7 +77,7 @@ export const Level01TrafficLights: React.FC<LevelComponentProps> = ({
               sound.click();
               setMagnify((m) => !m);
             }}
-            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-[#2C313C] bg-[#1A1D24] px-3 py-1.5 text-xs font-medium text-[#F2F0EB] transition-colors hover:border-[#DC2626] hover:text-white"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-[#2C313C] bg-[#1A1D24] px-3 py-1.5 text-xs font-medium text-[#F2F0EB] transition-colors hover:border-[#DC2626] hover:text-white active:scale-[0.98]"
           >
             <Search className="h-3.5 w-3.5 text-[#EF4444]" />
             {magnify ? 'Disable Squint Lens' : 'Enable Squint Lens'}
@@ -103,7 +103,7 @@ export const Level01TrafficLights: React.FC<LevelComponentProps> = ({
             >
               <CaptchaTileArt kind={item.art} alt={item.label} magnified={magnify} />
               {isSelected && (
-                <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#DC2626] text-white shadow-md">
+                <span className="animate-pop absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#DC2626] text-white shadow-md">
                   <Check className="h-3.5 w-3.5 stroke-[3]" />
                 </span>
               )}

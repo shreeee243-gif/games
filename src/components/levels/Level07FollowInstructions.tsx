@@ -3,6 +3,7 @@ import type { LevelComponentProps } from '../../game/types';
 import { sound } from '../../utils/sound';
 
 export const Level07FollowInstructions: React.FC<LevelComponentProps> = ({
+  isPaused,
   onSuccess,
   onFail,
 }) => {
@@ -10,24 +11,30 @@ export const Level07FollowInstructions: React.FC<LevelComponentProps> = ({
   const [blueTurnedRed, setBlueTurnedRed] = useState(false);
   const onSuccessRef = React.useRef(onSuccess);
   onSuccessRef.current = onSuccess;
+  const completedRef = React.useRef(false);
 
   useEffect(() => {
+    if (isPaused || completedRef.current) return;
     const timer = window.setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(timer);
-          onSuccessRef.current(
-            'Shocking impulse control! You actually refused to press the giant red button.',
-          );
-          return 0;
-        }
-        return prev - 1;
-      });
+      setSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [isPaused]);
+
+  useEffect(() => {
+    if (isPaused || completedRef.current) return;
+    if (secondsLeft > 0 && secondsLeft <= 3) {
+      sound.countdownTick();
+    } else if (secondsLeft === 0) {
+      completedRef.current = true;
+      onSuccessRef.current(
+        'Shocking impulse control! You actually refused to press the giant red button.',
+      );
+    }
+  }, [secondsLeft, isPaused]);
 
   const hitRedBait = (label: string) => {
+    if (completedRef.current) return;
     setSecondsLeft(5);
     onFail(label);
   };

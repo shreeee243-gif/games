@@ -43,7 +43,7 @@ export const Level11Sentient: React.FC<LevelComponentProps> = ({
         </p>
       </div>
 
-      <div className="relative h-56 w-full overflow-hidden rounded-md border border-[#2C313C] bg-[#0F1116]">
+      <div className="relative h-56 w-full touch-none select-none overflow-hidden rounded-md border border-[#2C313C] bg-[#0F1116]">
         {/* Massive growing surrender button */}
         <div className="flex h-full w-full items-center justify-center p-4">
           <button
@@ -53,7 +53,7 @@ export const Level11Sentient: React.FC<LevelComponentProps> = ({
               onSurrender?.();
             }}
             style={{ transform: `scale(${1 + hits * 0.08})` }}
-            className="min-h-[52px] rounded-md bg-[#DC2626] px-6 py-3.5 text-sm font-bold tracking-wide text-white shadow-lg transition-transform duration-200 hover:bg-[#B91C1C]"
+            className="min-h-[52px] rounded-md bg-[#DC2626] px-6 py-3.5 text-sm font-bold tracking-wide text-white shadow-lg transition-transform duration-200 hover:bg-[#B91C1C] active:scale-[0.97]"
           >
             SURRENDER HUMANITY TO CAPTCHA
           </button>
@@ -68,7 +68,7 @@ export const Level11Sentient: React.FC<LevelComponentProps> = ({
             top: `${pos.y}%`,
             transform: 'translate(-50%, -50%)',
           }}
-          className="absolute min-h-[40px] whitespace-nowrap rounded-md border border-[#525A6B] bg-[#171B24] px-3 py-2 text-xs font-semibold text-[#F2F0EB] shadow-md transition-all duration-200 hover:border-[#22C55E] hover:text-[#86EFAC]"
+          className="absolute min-h-[44px] whitespace-nowrap rounded-md border border-[#525A6B] bg-[#171B24] px-3.5 py-2 text-xs font-semibold text-[#F2F0EB] shadow-md transition-all duration-200 hover:border-[#22C55E] hover:text-[#86EFAC] active:scale-[0.96]"
         >
           {pos.text} ({hits}/3)
         </button>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { loadUnlockedEndings } from '../game/engine';
 import { sound } from '../utils/sound';
 
 interface TitleScreenProps {
@@ -8,6 +9,14 @@ interface TitleScreenProps {
 export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
   const [eyeOffset, setEyeOffset] = useState({ x: 0, y: 0 });
   const [checkboxState, setCheckboxState] = useState<'idle' | 'checking' | 'betrayed'>('idle');
+  const timersRef = React.useRef<number[]>([]);
+  const unlockedCount = React.useMemo(() => loadUnlockedEndings().length, []);
+
+  React.useEffect(() => {
+    return () => {
+      timersRef.current.forEach((id) => window.clearTimeout(id));
+    };
+  }, []);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const nx = (e.clientX / window.innerWidth - 0.5) * 6;
@@ -19,13 +28,15 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
     if (checkboxState !== 'idle') return;
     sound.click();
     setCheckboxState('checking');
-    window.setTimeout(() => {
+    const t1 = window.setTimeout(() => {
       sound.glitch();
       setCheckboxState('betrayed');
-      window.setTimeout(() => {
+      const t2 = window.setTimeout(() => {
         onStart();
       }, 420);
+      timersRef.current.push(t2);
     }, 480);
+    timersRef.current.push(t1);
   };
 
   return (
@@ -36,7 +47,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
       {/* Top quiet brand spacer so the centerpiece breathes over calm negative space */}
       <div className="flex w-full max-w-4xl items-center justify-between text-xs text-[#717786]">
         <span className="font-mono-tabular tracking-wider">HUMANITY GATEWAY</span>
-        <span className="font-mono-tabular">12 SECURITY LAYERS</span>
+        <span className="font-mono-tabular">
+          {unlockedCount > 0 ? `VERDICTS ${unlockedCount}/5 · ` : ''}12 SECURITY LAYERS
+        </span>
       </div>
 
       {/* Main Focal Anchor */}

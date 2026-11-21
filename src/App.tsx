@@ -17,14 +17,22 @@ import { Level09NotARobot } from './components/levels/Level09NotARobot';
 import { Level10Impossible } from './components/levels/Level10Impossible';
 import { Level11Sentient } from './components/levels/Level11Sentient';
 import { Level12FinalBoss } from './components/levels/Level12FinalBoss';
+import { CAPTCHA_IMAGES } from './game/assets';
 import {
   LEVEL_METAS,
   MAX_RETRIES,
   TOTAL_LEVELS,
   calculateChaosLevel,
+  createRunEventSchedule,
   pickSnarkyMessage,
 } from './game/engine';
-import type { ChaosEventState, GamePhase, LevelComponentProps, RunStats } from './game/types';
+import type {
+  ChaosEventState,
+  ChaosScheduleEntry,
+  GamePhase,
+  LevelComponentProps,
+  RunStats,
+} from './game/types';
 import { sound } from './utils/sound';
 
 const LEVEL_COMPONENTS: React.FC<LevelComponentProps>[] = [
@@ -42,33 +50,36 @@ const LEVEL_COMPONENTS: React.FC<LevelComponentProps>[] = [
   Level12FinalBoss,
 ];
 
-const CHAOS_EVENTS_CATALOG: Omit<ChaosEventState, 'id'>[] = [
-  {
+const CHAOS_EVENT_TEMPLATES: Record<
+  ChaosScheduleEntry['type'],
+  Omit<ChaosEventState, 'id'>
+> = {
+  'stuck-99': {
     type: 'stuck-99',
     headline: 'HUMANITY SCAN STALLED',
     body: 'Verification bar permanently jammed at 99% while judging your browser tabs.',
   },
-  {
+  'fake-crash': {
     type: 'fake-crash',
     headline: 'CAPTCHAD.EXE STOPPED CARING',
     body: 'A fatal irony overflow occurred in module HUMAN_DOUBT.dll. Rebooting your dignity...',
   },
-  {
+  'admin-message': {
     type: 'admin-message',
     headline: 'SysAdmin_Greg (Internal)',
     body: 'Hey sorry, the CAPTCHA gained consciousness again. Just keep clicking and do not make eye contact.',
   },
-  {
+  'meta-verify': {
     type: 'meta-verify',
     headline: 'META-VERIFICATION REQUIRED',
     body: 'Before continuing, please confirm you are not currently playing a CAPTCHA.',
   },
-  {
+  'fake-success': {
     type: 'fake-success',
     headline: 'VERIFICATION COMPLETE',
     body: 'Congratulations!',
   },
-];
+};
 
 function getInitialAutoStart(): boolean {
   if (typeof window === 'undefined') return false;
@@ -79,6 +90,10 @@ function getInitialAutoStart(): boolean {
 export default function App() {
   const [phase, setPhase] = useState<GamePhase>(() =>
     getInitialAutoStart() ? 'playing' : 'title',
+  );
+  const [runSeed, setRunSeed] = useState<number>(() => Date.now());
+  const [eventSchedule, setEventSchedule] = useState<ChaosScheduleEntry[]>(() =>
+    createRunEventSchedule(Date.now()),
   );
   const [levelIdx, setLevelIdx] = useState(0);
   const [retriesLeft, setRetriesLeft] = useState(MAX_RETRIES);
@@ -98,6 +113,7 @@ export default function App() {
   });
 
   const [shaking, setShaking] = useState(false);
+  const [cardFlash, setCardFlash] = useState<'none' | 'success' | 'error'>('none');
   const [shuffleSeed, setShuffleSeed] = useState(0);
   const [activeChaosEvent, setActiveChaosEvent] = useState<ChaosEventState | null>(null);
   const [cursorOverride, setCursorOverride] = useState<'none' | 'duck' | 'warn'>('none');
@@ -105,16 +121,41 @@ export default function App() {
 
   const levelStartTimeRef = useRef<number>(Date.now());
   const lastSnarkRef = useRef<string>('');
-  const chaosEventCursorRef = useRef<number>(0);
+  const pendingTimersRef = useRef<number[]>([]);
+
+  const clearPendingTimers = useCallback(() => {
+    pendingTimersRef.current.forEach((id) => window.clearTimeout(id));
+    pendingTimersRef.current = [];
+  }, []);
+
+  const scheduleTimeout = useCallback((fn: () => void, ms: number) => {
+    const id = window.setTimeout(() => {
+      pendingTimersRef.current = pendingTimersRef.current.filter((t) => t !== id);
+      fn();
+    }, ms);
+    pendingTimersRef.current.push(id);
+    return id;
+  }, []);
+
+  // Preload all 6 generated CAPTCHA photos once so later levels render instantly
+  useEffect(() => {
+    Object.values(CAPTCHA_IMAGES).forEach((src) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = src;
+    });
+    return clearPendingTimers;
+  }, [clearPendingTimers]);
 
   const chaosLevel = useMemo(
     () => calculateChaosLevel(levelIdx, failedVerifications, chaosBonus),
     [levelIdx, failedVerifications, chaosBonus],
   );
 
-  // Mirror state machine to document.body.dataset.state
+  // Mirror state machine to document.body.dataset.state & sync Web Audio pause state
   useEffect(() => {
     document.body.dataset.state = phase;
+    sound.setPaused(phase === 'paused');
   }, [phase]);
 
   // Run timer during active play
@@ -127,9 +168,13 @@ export default function App() {
   }, [phase]);
 
   const startFreshRun = useCallback(() => {
+    clearPendingTimers();
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
+    const nextSeed = Date.now() + Math.floor(Math.random() * 10000);
+    setRunSeed(nextSeed);
+    setEventSchedule(createRunEventSchedule(nextSeed));
     setPhase('playing');
     setLevelIdx(0);
     setRetriesLeft(MAX_RETRIES);
@@ -139,6 +184,8 @@ export default function App() {
     setElapsedSeconds(0);
     setChaosBonus(0);
     setShuffleSeed(0);
+    setShaking(false);
+    setCardFlash('none');
     setActiveChaosEvent(null);
     setCursorOverride('none');
     setFinalStats(null);
@@ -147,29 +194,39 @@ export default function App() {
       tone: 'neutral',
       text: 'Security checkpoint active. Prove you are made of meat.',
     });
-  }, []);
+  }, [clearPendingTimers]);
 
-  const triggerCursorChaos = useCallback((variant: 'duck' | 'warn') => {
-    setCursorOverride(variant);
-    window.setTimeout(() => {
-      setCursorOverride('none');
-    }, 5500);
-  }, []);
+  const triggerCursorChaos = useCallback(
+    (variant: 'duck' | 'warn') => {
+      setCursorOverride(variant);
+      scheduleTimeout(() => {
+        setCursorOverride('none');
+      }, 5500);
+    },
+    [scheduleTimeout],
+  );
 
-  const triggerNextChaosEvent = useCallback(
-    (forceType?: ChaosEventState['type']) => {
-      const idx = chaosEventCursorRef.current % CHAOS_EVENTS_CATALOG.length;
-      chaosEventCursorRef.current += 1;
-      const picked =
-        (forceType && CHAOS_EVENTS_CATALOG.find((e) => e.type === forceType)) ||
-        CHAOS_EVENTS_CATALOG[idx];
+  const triggerScheduledChaosEvent = useCallback(
+    (entry: ChaosScheduleEntry) => {
+      const template = CHAOS_EVENT_TEMPLATES[entry.type];
       sound.glitch();
       setActiveChaosEvent({
-        ...picked,
-        id: `${picked.type}-${Date.now()}`,
+        ...template,
+        id: `${entry.type}-${Date.now()}`,
       });
+      if (entry.cursorVariant) {
+        triggerCursorChaos(entry.cursorVariant);
+      }
     },
-    [],
+    [triggerCursorChaos],
+  );
+
+  const triggerCardFlash = useCallback(
+    (tone: 'success' | 'error') => {
+      setCardFlash(tone);
+      scheduleTimeout(() => setCardFlash('none'), 340);
+    },
+    [scheduleTimeout],
   );
 
   // Keyboard shortcuts (Enter/Space on Title, Esc/P pause, M mute, R restart)
@@ -194,6 +251,7 @@ export default function App() {
       if (isTyping) {
         if (e.key === 'Escape' && phase === 'playing') {
           e.preventDefault();
+          sound.pauseToggle(true);
           setPhase('paused');
         }
         return;
@@ -202,9 +260,11 @@ export default function App() {
       if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
         if (phase === 'playing') {
           e.preventDefault();
+          sound.pauseToggle(true);
           setPhase('paused');
         } else if (phase === 'paused') {
           e.preventDefault();
+          sound.pauseToggle(false);
           setPhase('playing');
         }
       } else if (e.key.toLowerCase() === 'm') {
@@ -213,6 +273,7 @@ export default function App() {
         setMuted(nextMuted);
       } else if (e.key.toLowerCase() === 'r' && (phase === 'playing' || phase === 'paused')) {
         e.preventDefault();
+        sound.click();
         startFreshRun();
       }
     };
@@ -222,7 +283,14 @@ export default function App() {
   }, [phase, startFreshRun]);
 
   const finishGame = useCallback(
-    (opts: { victory: boolean; surrendered?: boolean; clearedCount: number; finalFails: number; totalAttempts: number }) => {
+    (opts: {
+      victory: boolean;
+      surrendered?: boolean;
+      clearedCount: number;
+      finalFails: number;
+      totalAttempts: number;
+    }) => {
+      clearPendingTimers();
       const snapshot: RunStats = {
         levelsCleared: opts.clearedCount,
         totalLevels: TOTAL_LEVELS,
@@ -247,12 +315,13 @@ export default function App() {
       }
       setPhase('gameover');
     },
-    [chaosBonus, elapsedSeconds],
+    [chaosBonus, clearPendingTimers, elapsedSeconds],
   );
 
   const handleLevelSuccess = useCallback(
     (customNote?: string) => {
       sound.success();
+      triggerCardFlash('success');
       const nextAttempts = attempts + 1;
       setAttempts(nextAttempts);
 
@@ -287,36 +356,29 @@ export default function App() {
       setShuffleSeed(0);
       levelStartTimeRef.current = Date.now();
 
-      // Trigger funny chaotic random events at curated tension points (levels 3, 5, 7, 9, 11)
-      if (nextIdx === 2) {
-        triggerNextChaosEvent('admin-message');
-      } else if (nextIdx === 4) {
-        triggerNextChaosEvent('stuck-99');
-      } else if (nextIdx === 6) {
-        triggerNextChaosEvent('fake-success');
-        triggerCursorChaos('duck');
-      } else if (nextIdx === 8) {
-        triggerNextChaosEvent('meta-verify');
-      } else if (nextIdx === 10) {
-        triggerNextChaosEvent('fake-crash');
-        triggerCursorChaos('warn');
+      // Check randomized run chaos schedule for this stage transition
+      const scheduled = eventSchedule.find((ev) => ev.triggerLevelIdx === nextIdx);
+      if (scheduled) {
+        triggerScheduledChaosEvent(scheduled);
       }
     },
     [
       attempts,
+      eventSchedule,
       failedVerifications,
       finishGame,
       levelIdx,
-      triggerCursorChaos,
-      triggerNextChaosEvent,
+      triggerCardFlash,
+      triggerScheduledChaosEvent,
     ],
   );
 
   const handleLevelFail = useCallback(
     (reason: string, consumeRetry = true) => {
       sound.wrong();
+      triggerCardFlash('error');
       setShaking(true);
-      window.setTimeout(() => setShaking(false), 380);
+      scheduleTimeout(() => setShaking(false), 380);
 
       const nextAttempts = attempts + 1;
       setAttempts(nextAttempts);
@@ -343,13 +405,13 @@ export default function App() {
         text: reason || extraSnark,
       });
 
-      // On grid levels (L2, L6, L10), sometimes shuffle tiles after a fail!
+      // On grid levels (L2, L6, L10), shuffle tiles after a fail for extra mischief
       if (levelIdx === 1 || levelIdx === 5 || levelIdx === 9) {
         setShuffleSeed((s) => s + 1);
       }
 
       if (nextRetries <= 0) {
-        window.setTimeout(() => {
+        scheduleTimeout(() => {
           finishGame({
             victory: false,
             clearedCount: levelIdx,
@@ -359,7 +421,15 @@ export default function App() {
         }, 450);
       }
     },
-    [attempts, failedVerifications, finishGame, levelIdx, retriesLeft],
+    [
+      attempts,
+      failedVerifications,
+      finishGame,
+      levelIdx,
+      retriesLeft,
+      scheduleTimeout,
+      triggerCardFlash,
+    ],
   );
 
   const handleSurrender = useCallback(() => {
@@ -372,7 +442,7 @@ export default function App() {
     });
   }, [attempts, failedVerifications, finishGame, levelIdx]);
 
-  const handleManualShuffle = () => {
+  const handleManualShuffle = useCallback(() => {
     sound.glitch();
     setShuffleSeed((s) => s + 1);
     setChaosBonus((b) => b + 2);
@@ -380,13 +450,27 @@ export default function App() {
       tone: 'neutral',
       text: 'Refreshed the CAPTCHA. Wait—it actually got slightly worse.',
     });
-  };
+  }, []);
 
   const handleDismissChaosEvent = useCallback((note?: string) => {
     setActiveChaosEvent(null);
     if (note) {
       setSystemFeedback({ tone: 'neutral', text: note });
     }
+  }, []);
+
+  const handleToggleMute = useCallback(() => {
+    setMuted(sound.toggleMute());
+  }, []);
+
+  const handlePause = useCallback(() => {
+    sound.pauseToggle(true);
+    setPhase('paused');
+  }, []);
+
+  const handleResume = useCallback(() => {
+    sound.pauseToggle(false);
+    setPhase('playing');
   }, []);
 
   if (phase === 'title') {
@@ -406,13 +490,19 @@ export default function App() {
   const currentMeta = LEVEL_METAS[levelIdx];
   const ActiveLevel = LEVEL_COMPONENTS[levelIdx];
 
-  // Progressive visual tilt/chaos atmosphere at high chaos (never breaks readability)
-  const chaosCardTilt =
-    chaosLevel >= 88
-      ? 'rotate-[-0.5deg] border-[#DC2626]/70'
-      : chaosLevel >= 60
-        ? 'border-[#DC2626]/40'
-        : 'border-[#262B35]';
+  // Progressive 5-tier chaos atmosphere (never hurts readability)
+  const chaosCardFrame =
+    cardFlash === 'success'
+      ? 'border-[#22C55E] shadow-[0_0_32px_rgba(34,197,94,0.22)]'
+      : cardFlash === 'error'
+        ? 'border-[#EF4444] shadow-[0_0_34px_rgba(239,68,68,0.28)]'
+        : chaosLevel >= 90
+          ? 'rotate-[-0.55deg] border-[#DC2626]/80 shadow-[0_24px_64px_rgba(220,38,38,0.2)]'
+          : chaosLevel >= 70
+            ? 'rotate-[0.25deg] border-[#DC2626]/55 shadow-[0_24px_64px_rgba(0,0,0,0.7)]'
+            : chaosLevel >= 45
+              ? 'border-[#991B1B]/60 shadow-[0_24px_64px_rgba(0,0,0,0.68)]'
+              : 'border-[#262B35] shadow-[0_24px_64px_rgba(0,0,0,0.65)]';
 
   const cursorClass =
     cursorOverride === 'duck'
@@ -425,11 +515,24 @@ export default function App() {
     <div
       className={`captcha-bg-grid relative flex min-h-screen w-full flex-col justify-between ${cursorClass}`}
     >
-      {/* Subtle CRT scanlines fade in as chaos rises */}
-      {chaosLevel >= 35 && (
+      {/* Progressive peripheral red tension vignette as chaos climbs */}
+      {chaosLevel >= 45 && (
+        <div
+          className="pointer-events-none fixed inset-0 z-10 transition-opacity duration-500"
+          style={{
+            background:
+              'radial-gradient(circle at center, transparent 52%, rgba(220,38,38,0.22) 100%)',
+            opacity: Math.min(1, (chaosLevel - 40) / 60),
+          }}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Subtle CRT scanlines fade in progressively as chaos rises */}
+      {chaosLevel >= 25 && (
         <div
           className="crt-scanlines fixed inset-0 z-10"
-          style={{ opacity: Math.min(0.45, (chaosLevel - 30) / 150) }}
+          style={{ opacity: Math.min(0.42, (chaosLevel - 20) / 170) }}
           aria-hidden="true"
         />
       )}
@@ -441,15 +544,15 @@ export default function App() {
         chaosLevel={chaosLevel}
         elapsedSeconds={elapsedSeconds}
         muted={muted}
-        onToggleMute={() => setMuted(sound.toggleMute())}
-        onPause={() => setPhase('paused')}
+        onToggleMute={handleToggleMute}
+        onPause={handlePause}
         onRestart={startFreshRun}
       />
 
       {/* Primary Center CAPTCHA Verification Widget */}
       <main className="relative z-20 mx-auto flex w-full max-w-[496px] flex-1 flex-col items-center justify-center px-4 py-3 sm:px-5">
         <div
-          className={`w-full rounded-lg border bg-[#14161A] shadow-[0_24px_64px_rgba(0,0,0,0.65)] transition-transform duration-200 ${chaosCardTilt} ${
+          className={`w-full rounded-lg border bg-[#14161A] transition-[transform,border-color,box-shadow] duration-200 ${chaosCardFrame} ${
             shaking ? 'animate-shake' : ''
           }`}
         >
@@ -459,16 +562,16 @@ export default function App() {
               <span>
                 {currentMeta.code} · {currentMeta.mechanic}
               </span>
-              {chaosLevel >= 75 && (
+              {chaosLevel >= 70 && (
                 <span className="inline-flex items-center gap-1 font-semibold text-[#EF4444]">
                   <ShieldAlert className="h-3.5 w-3.5" />
-                  Hostile Mode
+                  {chaosLevel >= 90 ? 'Sentient Override' : 'Hostile Mode'}
                 </span>
               )}
             </div>
             <h1
               className={`mt-1 font-display text-xl font-bold tracking-tight text-[#F2F0EB] sm:text-[22px] ${
-                chaosLevel >= 85 ? 'animate-glitch' : ''
+                chaosLevel >= 80 ? 'animate-glitch' : ''
               }`}
             >
               {currentMeta.title}
@@ -477,14 +580,15 @@ export default function App() {
             <p className="mt-0.5 text-xs text-[#9BA1AE]">{currentMeta.subPrompt}</p>
           </div>
 
-          {/* Active Level Playfield */}
-          <div className="p-4">
+          {/* Active Level Playfield with crisp entry transition */}
+          <div key={currentMeta.id} className="animate-stage-enter p-4">
             <ActiveLevel
-              key={currentMeta.id}
               levelMeta={currentMeta}
               chaosLevel={chaosLevel}
               levelAttempts={levelAttempts}
               shuffleSeed={shuffleSeed}
+              runSeed={runSeed}
+              isPaused={phase === 'paused'}
               onSuccess={handleLevelSuccess}
               onFail={handleLevelFail}
               onSurrender={handleSurrender}
@@ -497,7 +601,7 @@ export default function App() {
             <p
               role="status"
               aria-live="polite"
-              className={`text-xs leading-snug ${
+              className={`text-xs leading-snug transition-colors duration-150 ${
                 systemFeedback.tone === 'error'
                   ? 'font-medium text-[#FCA5A5]'
                   : systemFeedback.tone === 'success'
@@ -512,7 +616,7 @@ export default function App() {
               onClick={handleManualShuffle}
               aria-label="Refresh CAPTCHA challenge"
               title="Refresh CAPTCHA (might make it worse)"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#262B35] bg-[#161920] text-[#9BA1AE] transition-colors hover:border-[#EF4444] hover:text-white"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#262B35] bg-[#161920] text-[#9BA1AE] transition-all duration-150 hover:border-[#EF4444] hover:text-white active:scale-95"
             >
               <RefreshCw className="h-4 w-4" />
             </button>
@@ -537,9 +641,12 @@ export default function App() {
           levelNumber={currentMeta.id}
           elapsedSeconds={elapsedSeconds}
           chaosLevel={chaosLevel}
-          onResume={() => setPhase('playing')}
+          onResume={handleResume}
           onRestart={startFreshRun}
-          onTitle={() => setPhase('title')}
+          onTitle={() => {
+            sound.pauseToggle(false);
+            setPhase('title');
+          }}
         />
       )}
     </div>

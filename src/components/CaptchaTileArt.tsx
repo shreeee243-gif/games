@@ -69,6 +69,7 @@ function PhotoFrame({
           src={src}
           alt={alt}
           referrerPolicy="no-referrer"
+          decoding="async"
           draggable={false}
           onError={() => setFailed(true)}
           className={`h-full w-full select-none transition-transform duration-200 ${imgClass}`}
@@ -100,7 +101,7 @@ function TinyTrafficLight({ className }: { className: string }) {
   );
 }
 
-export const CaptchaTileArt: React.FC<CaptchaTileArtProps> = ({ kind, alt, magnified }) => {
+export const CaptchaTileArt: React.FC<CaptchaTileArtProps> = React.memo(({ kind, alt, magnified }) => {
   switch (kind) {
     // --- LEVEL 1: TRAFFIC LIGHTS ---
     case 'photo-traffic-main':
@@ -466,4 +467,5 @@ export const CaptchaTileArt: React.FC<CaptchaTileArtProps> = ({ kind, alt, magni
         </div>
       );
   }
-};
+});
+CaptchaTileArt.displayName = 'CaptchaTileArt';

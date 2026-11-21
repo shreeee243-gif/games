@@ -4,6 +4,7 @@ import type { LevelComponentProps } from '../../game/types';
 import { sound } from '../../utils/sound';
 
 export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
+  isPaused,
   onSuccess,
   onFail,
   onChaosSpike,
@@ -24,7 +25,7 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
   onSuccessRef.current = onSuccess;
 
   useEffect(() => {
-    if (phase !== 1) return;
+    if (phase !== 1 || isPaused) return;
     const interval = window.setInterval(() => {
       setDuckPos({
         x: 20 + Math.floor(Math.random() * 60),
@@ -32,10 +33,17 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
       });
     }, 1150);
     return () => window.clearInterval(interval);
-  }, [phase]);
+  }, [phase, isPaused]);
 
   useEffect(() => {
-    if (!holding || phase !== 3) {
+    if (isPaused && holding) {
+      setHolding(false);
+      setHoldPct(0);
+    }
+  }, [isPaused, holding]);
+
+  useEffect(() => {
+    if (!holding || phase !== 3 || isPaused) {
       if (holdRafRef.current) cancelAnimationFrame(holdRafRef.current);
       return;
     }
@@ -46,6 +54,7 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
       const elapsed = now - holdStartRef.current;
       const pct = Math.min(100, (elapsed / duration) * 100);
       setHoldPct(pct);
+      sound.holdTick(pct);
       if (pct >= 100 && !finishedRef.current) {
         finishedRef.current = true;
         setHolding(false);
@@ -59,7 +68,7 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
     return () => {
       if (holdRafRef.current) cancelAnimationFrame(holdRafRef.current);
     };
-  }, [holding, phase]);
+  }, [holding, phase, isPaused]);
 
   const handleBossDuckClick = () => {
     if (!duckDodged) {
@@ -84,7 +93,7 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
   };
 
   const startHold = () => {
-    if (finishedRef.current) return;
+    if (finishedRef.current || isPaused) return;
     sound.glitch();
     setHolding(true);
   };
@@ -117,18 +126,18 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
               ? 'Boss Duck took 1 hit! Catch it ONE more time!'
               : 'Phase 1: Click the Sunglasses Boss Duck twice while ignoring fake VERIFY buttons.'}
           </p>
-          <div className="relative h-56 w-full overflow-hidden rounded-md border border-[#DC2626]/50 bg-[#101217]">
+          <div className="relative h-56 w-full touch-none select-none overflow-hidden rounded-md border border-[#DC2626]/50 bg-[#101217]">
             <button
               type="button"
               onClick={() => onFail('That was a decoy VERIFY button! Aim for the duck!')}
-              className="absolute left-[18%] top-[22%] min-h-[38px] rounded border border-[#3F4451] bg-[#1B1F29] px-3 py-1.5 text-xs font-semibold text-[#9BA1AE] hover:border-[#EF4444]"
+              className="absolute left-[14%] top-[18%] min-h-[44px] rounded border border-[#3F4451] bg-[#1B1F29] px-3.5 py-2 text-xs font-semibold text-[#9BA1AE] hover:border-[#EF4444]"
             >
               FAKE VERIFY
             </button>
             <button
               type="button"
               onClick={() => onFail('Still a decoy! The duck is wearing sunglasses!')}
-              className="absolute bottom-[16%] right-[14%] min-h-[38px] rounded border border-[#3F4451] bg-[#1B1F29] px-3 py-1.5 text-xs font-semibold text-[#9BA1AE] hover:border-[#EF4444]"
+              className="absolute bottom-[14%] right-[12%] min-h-[44px] rounded border border-[#3F4451] bg-[#1B1F29] px-3.5 py-2 text-xs font-semibold text-[#9BA1AE] hover:border-[#EF4444]"
             >
               SKIP TEST
             </button>
@@ -215,6 +224,7 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
 
           <button
             type="button"
+            onContextMenu={(e) => e.preventDefault()}
             onPointerDown={startHold}
             onPointerUp={cancelHold}
             onPointerLeave={cancelHold}
@@ -231,7 +241,7 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
                 cancelHold();
               }
             }}
-            className={`min-h-[54px] w-full select-none rounded-md px-6 py-3.5 text-sm font-bold tracking-wider text-white transition-transform ${
+            className={`min-h-[54px] w-full touch-none select-none rounded-md px-6 py-3.5 text-sm font-bold tracking-wider text-white transition-transform ${
               holding
                 ? 'scale-[0.98] bg-[#16A34A] ring-2 ring-[#4ADE80]'
                 : 'bg-[#DC2626] hover:bg-[#B91C1C]'

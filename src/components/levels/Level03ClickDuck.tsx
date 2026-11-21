@@ -135,7 +135,7 @@ export const Level03ClickDuck: React.FC<LevelComponentProps> = ({
       <div
         ref={arenaRef}
         onPointerMove={handleArenaPointerMove}
-        className="relative h-64 w-full overflow-hidden rounded-md border border-[#262B35] bg-[#101217] sm:h-72"
+        className="relative h-64 w-full touch-none select-none overflow-hidden rounded-md border border-[#262B35] bg-[#101217] sm:h-72"
       >
         {/* Pond radar grid lines */}
         <div

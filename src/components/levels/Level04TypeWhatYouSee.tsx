@@ -3,28 +3,37 @@ import { Lock, Unlock } from 'lucide-react';
 import type { LevelComponentProps } from '../../game/types';
 import { sound } from '../../utils/sound';
 
-const CODE_STAGES = ['H3LL7X', 'H3LL9Q', 'H3LL42'];
+const CODE_POOLS = [
+  ['H3LL7X', 'H3LL9Q', 'H3LL42'],
+  ['N0TB0T', 'N0TB8Z', 'N0TB3X'],
+  ['M3AT7K', 'M3AT2V', 'M3AT99'],
+];
 
 export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
+  runSeed,
   onSuccess,
   onFail,
 }) => {
+  const codeStages = React.useMemo(
+    () => CODE_POOLS[Math.abs(runSeed) % CODE_POOLS.length],
+    [runSeed],
+  );
   const [stageIdx, setStageIdx] = useState(0);
   const [locked, setLocked] = useState(false);
   const [value, setValue] = useState('');
   const [note, setNote] = useState('Case-insensitive. Mostly.');
 
-  const currentCode = CODE_STAGES[stageIdx];
+  const currentCode = codeStages[stageIdx];
 
   const handleChange = (nextVal: string) => {
     setValue(nextVal);
-    if (!locked && stageIdx < CODE_STAGES.length - 1) {
+    if (!locked && stageIdx < codeStages.length - 1) {
       if (
         (stageIdx === 0 && nextVal.length === 4) ||
         (stageIdx === 1 && nextVal.length === 5)
       ) {
         sound.glitch();
-        setStageIdx((s) => Math.min(CODE_STAGES.length - 1, s + 1));
+        setStageIdx((s) => Math.min(codeStages.length - 1, s + 1));
         setNote('Oops, the last two characters mutated while you were typing. Keep up!');
       }
     }
@@ -47,7 +56,7 @@ export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
       onSuccess('Accurate transcription despite active sabotage. Impressive.');
       return;
     }
-    if (CODE_STAGES.includes(cleaned)) {
+    if (codeStages.includes(cleaned)) {
       onFail(
         `You typed "${cleaned}", which was the code 2 seconds ago. Check the updated ending!`,
       );
@@ -64,7 +73,7 @@ export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
           onClick={handleLock}
           aria-label={locked ? 'Text is locked' : 'Freeze mutating text'}
           title={locked ? 'Text frozen' : 'Freeze mutating text'}
-          className={`absolute right-2.5 top-2.5 inline-flex min-h-[32px] items-center gap-1 rounded border px-2 py-1 font-mono text-[11px] transition-colors ${
+          className={`absolute right-2.5 top-2.5 inline-flex min-h-[40px] items-center gap-1 rounded border px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
             locked
               ? 'border-[#22C55E]/50 bg-[#0D2818] text-[#86EFAC]'
               : 'border-[#2A2F3A] bg-[#171A21] text-[#9BA1AE] hover:border-[#EF4444] hover:text-white'

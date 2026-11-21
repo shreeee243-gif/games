@@ -91,7 +91,7 @@ export const Level09NotARobot: React.FC<LevelComponentProps> = ({
               key={opt.id}
               type="button"
               onClick={() => handleChoose(opt)}
-              className={`min-h-[48px] w-full rounded-md border px-4 py-3 text-left text-sm font-medium transition-all duration-150 focus-visible:outline-2 focus-visible:outline-[#EF4444] ${
+              className={`min-h-[48px] w-full rounded-md border px-4 py-3 text-left text-sm font-medium transition-all duration-150 active:scale-[0.985] focus-visible:outline-2 focus-visible:outline-[#EF4444] ${
                 shifted
                   ? 'translate-x-2 border-[#EF4444] bg-[#241316] text-white'
                   : 'border-[#2A2F3A] bg-[#161920] text-[#F2F0EB] hover:border-[#EF4444] hover:bg-[#1E222B]'
