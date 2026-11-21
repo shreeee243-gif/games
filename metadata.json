@@ -1,0 +1,6 @@
+{
+  "name": "CAPTCHA FROM HELL",
+  "description": "A chaotic, hilarious, rage-inducing browser mini-game where an evil, sentient CAPTCHA system tries everything to prove you aren't human.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
