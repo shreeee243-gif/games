@@ -43,6 +43,7 @@ export const Level09NotARobot: React.FC<LevelComponentProps> = ({
 }) => {
   const [step, setStep] = useState(0);
   const [dodgedFinal, setDodgedFinal] = useState(false);
+  const [foundSessionClue, setFoundSessionClue] = useState(false);
 
   const current = QUESTIONS[step];
 
@@ -52,7 +53,6 @@ export const Level09NotARobot: React.FC<LevelComponentProps> = ({
       return;
     }
 
-    // On question 3, the right answer cheekily shifts once before accepting
     if (step === 2 && !dodgedFinal) {
       sound.glitch();
       setDodgedFinal(true);
@@ -61,7 +61,10 @@ export const Level09NotARobot: React.FC<LevelComponentProps> = ({
 
     sound.click();
     if (step + 1 >= QUESTIONS.length) {
-      onSuccess('Emotional dread about taxes confirmed. Welcome, fellow taxpayer.');
+      onSuccess(
+        'Emotional dread about taxes confirmed. Welcome, fellow taxpayer.',
+        foundSessionClue ? 'session-echo' : undefined,
+      );
     } else {
       setStep((s) => s + 1);
     }
@@ -69,15 +72,32 @@ export const Level09NotARobot: React.FC<LevelComponentProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-[#2C313C] bg-[#101217] p-4">
-        <div className="mb-1 font-mono-tabular text-xs uppercase tracking-wider text-[#EF4444]">
-          Polygraph Interrogation {step + 1} / {QUESTIONS.length}
+      <div className="rounded-md border border-[#333333] bg-[#141414] p-4">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <div className="font-mono-tabular text-xs uppercase tracking-wider text-[#D48A8A]">
+            Polygraph Interrogation {step + 1} / {QUESTIONS.length}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              sound.click();
+              setFoundSessionClue(true);
+            }}
+            className="font-mono text-[11px] text-[#7A7A7A] transition-colors hover:text-[#EEEEEE]"
+          >
+            Session #02
+          </button>
         </div>
-        <h3 className="font-display text-lg font-bold text-[#F2F0EB]">
+        <h3 className="font-display text-lg font-bold text-[#EEEEEE]">
           {current.prompt}
         </h3>
+        {foundSessionClue && (
+          <p className="mt-1.5 font-mono text-[11px] text-[#929292]">
+            Log note: Prior session answered identically 0.3s faster.
+          </p>
+        )}
         {step === 2 && dodgedFinal && (
-          <p className="mt-1.5 text-xs text-[#FCA5A5]">
+          <p className="mt-1.5 text-xs text-[#D48A8A]">
             Wait—are you SURE? Click it again if you really feel the tax dread.
           </p>
         )}
@@ -91,10 +111,10 @@ export const Level09NotARobot: React.FC<LevelComponentProps> = ({
               key={opt.id}
               type="button"
               onClick={() => handleChoose(opt)}
-              className={`min-h-[48px] w-full rounded-md border px-4 py-3 text-left text-sm font-medium transition-all duration-150 active:scale-[0.985] focus-visible:outline-2 focus-visible:outline-[#EF4444] ${
+              className={`min-h-[48px] w-full rounded-md border px-4 py-3 text-left text-sm font-medium transition-all duration-150 active:scale-[0.985] focus-visible:outline-2 focus-visible:outline-[#B84B4B] ${
                 shifted
-                  ? 'translate-x-2 border-[#EF4444] bg-[#241316] text-white'
-                  : 'border-[#2A2F3A] bg-[#161920] text-[#F2F0EB] hover:border-[#EF4444] hover:bg-[#1E222B]'
+                  ? 'translate-x-2 border-[#B84B4B] bg-[#241919] text-[#EEEEEE]'
+                  : 'border-[#333333] bg-[#222222] text-[#EEEEEE] hover:border-[#B84B4B] hover:bg-[#262626]'
               }`}
             >
               {opt.label}

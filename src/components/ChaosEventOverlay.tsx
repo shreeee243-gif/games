@@ -26,7 +26,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
     if (eventType === 'fake-success') {
       sound.fakeSuccessBetrayal();
       const t1 = window.setTimeout(() => setBetrayed(true), 800);
-      const t2 = window.setTimeout(() => onDismissRef.current('You passed! Just kidding.'), 1900);
+      const t2 = window.setTimeout(() => onDismissRef.current('Verification successful. Just kidding.'), 1900);
       return () => {
         window.clearTimeout(t1);
         window.clearTimeout(t2);
@@ -34,22 +34,22 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
     }
 
     if (eventType === 'admin-message') {
-      const t = window.setTimeout(() => onDismissRef.current(), 4600);
+      const t = window.setTimeout(() => onDismissRef.current(), 5200);
       return () => window.clearTimeout(t);
     }
   }, [eventId, eventType]);
 
   if (!event) return null;
 
-  // Non-blocking Admin toast in bottom-right corner
+  // Non-blocking quiet Administrator notification
   if (event.type === 'admin-message') {
     return (
       <div
         role="status"
-        className="animate-stage-enter fixed bottom-4 right-4 z-40 w-[calc(100%-2rem)] max-w-sm rounded-md border border-[#3F4451] bg-[#14171E] p-3.5 shadow-2xl"
+        className="animate-stage-enter fixed bottom-4 right-4 z-40 w-[calc(100%-2rem)] max-w-sm rounded-md border border-[#333333] bg-[#191919] p-3.5"
       >
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 font-mono text-xs font-semibold text-[#F59E0B]">
+          <div className="flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-[#B84B4B]">
             <Terminal className="h-3.5 w-3.5" />
             {event.headline}
           </div>
@@ -57,17 +57,17 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
             type="button"
             onClick={() => onDismissRef.current()}
             aria-label="Dismiss administrator message"
-            className="rounded p-1 text-[#717786] hover:text-white"
+            className="rounded p-1 text-[#929292] hover:text-[#EEEEEE]"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
-        <p className="mt-1.5 text-xs leading-relaxed text-[#D1D5DB]">{event.body}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-[#D0D0D0]">{event.body}</p>
       </div>
     );
   }
 
-  // Modal interruptions (funny, fast, 1-click dismissible)
+  // Modal interruptions styled as believable system notices
   return (
     <div
       role="dialog"
@@ -76,16 +76,16 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
     >
       {event.type === 'stuck-99' && (
-        <div className="animate-stage-enter w-full max-w-sm rounded-md border border-[#2C313C] bg-[#14161A] p-5 shadow-2xl">
-          <div className="font-mono text-xs uppercase tracking-wider text-[#EF4444]">
+        <div className="animate-stage-enter w-full max-w-sm rounded-md border border-[#333333] bg-[#191919] p-5">
+          <div className="font-mono text-[11px] uppercase tracking-wider text-[#B84B4B]">
             {event.headline}
           </div>
-          <p className="mt-2 text-sm text-[#F2F0EB]">{event.body}</p>
-          <div className="mt-4 h-3 w-full overflow-hidden rounded-sm bg-[#20242E]">
-            <div className="h-full w-[99%] bg-[#DC2626]" />
+          <p className="mt-2 text-sm text-[#EEEEEE]">{event.body}</p>
+          <div className="mt-4 h-2.5 w-full overflow-hidden rounded-xs bg-[#222222]">
+            <div className="h-full w-[99%] bg-[#B84B4B]" />
           </div>
-          <div className="mt-1.5 flex items-center justify-between font-mono-tabular text-xs text-[#9BA1AE]">
-            <span>Estimating soul weight...</span>
+          <div className="mt-1.5 flex items-center justify-between font-mono-tabular text-xs text-[#929292]">
+            <span>Comparing session signature...</span>
             <span>99%</span>
           </div>
           <button
@@ -94,7 +94,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
               sound.click();
               onDismissRef.current('Fine, skipping the last 1%. Impatient human.');
             }}
-            className="mt-4 min-h-[44px] w-full rounded-md border border-[#3F4451] bg-[#1D2129] px-4 py-2 text-xs font-semibold text-[#F2F0EB] transition-colors hover:border-[#EF4444] active:scale-[0.98]"
+            className="mt-4 min-h-[44px] w-full rounded border border-[#333333] bg-[#222222] px-4 py-2 text-xs font-semibold text-[#EEEEEE] transition-colors hover:border-[#666666]"
           >
             Kick Progress Bar
           </button>
@@ -102,22 +102,24 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
       )}
 
       {event.type === 'fake-crash' && (
-        <div className="animate-stage-enter w-full max-w-md rounded-md border-2 border-[#DC2626] bg-[#160B0D] p-5 font-mono shadow-2xl">
-          <div className="flex items-center gap-2 text-sm font-bold text-[#EF4444]">
-            <AlertTriangle className="h-5 w-5" />
+        <div className="animate-stage-enter w-full max-w-md rounded-md border border-[#B84B4B] bg-[#191919] p-5 font-mono">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#B84B4B]">
+            <AlertTriangle className="h-4 w-4" />
             {event.headline}
           </div>
-          <p className="mt-2.5 text-xs leading-relaxed text-[#FCA5A5]">{event.body}</p>
-          <div className="mt-3 rounded bg-black/40 p-2.5 text-[11px] text-[#9BA1AE]">
-            ERR_EMOTIONAL_DAMAGE · LINE 404 · BLAMING_USER=TRUE
+          <p className="mt-2.5 font-sans text-xs leading-relaxed text-[#EEEEEE]">
+            {event.body}
+          </p>
+          <div className="mt-3 rounded border border-[#262626] bg-[#111111] p-2.5 text-[11px] text-[#929292]">
+            ERR_IDENTITY_OVERLAP · MODULE 404 · ORIGINAL_SESSION=UNCONFIRMED
           </div>
           <button
             type="button"
             onClick={() => {
               sound.glitch();
-              onDismissRef.current('Server slapped back into consciousness.');
+              onDismissRef.current('Session restored. Please disregard the previous notification.');
             }}
-            className="mt-4 min-h-[44px] w-full rounded-md bg-[#DC2626] px-4 py-2.5 font-sans text-sm font-semibold text-white hover:bg-[#B91C1C]"
+            className="mt-4 min-h-[44px] w-full rounded bg-[#B84B4B] px-4 py-2.5 font-sans text-sm font-semibold text-[#EEEEEE] hover:bg-[#A03E3E]"
           >
             Slap Server to Reboot
           </button>
@@ -125,11 +127,11 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
       )}
 
       {event.type === 'meta-verify' && (
-        <div className="animate-stage-enter w-full max-w-sm rounded-md border border-[#3F4451] bg-[#14161A] p-5 shadow-2xl">
-          <div className="font-mono text-xs uppercase tracking-wider text-[#F59E0B]">
+        <div className="animate-stage-enter w-full max-w-sm rounded-md border border-[#333333] bg-[#191919] p-5">
+          <div className="font-mono text-[11px] uppercase tracking-wider text-[#929292]">
             {event.headline}
           </div>
-          <p className="mt-2 text-sm font-medium text-[#F2F0EB]">{event.body}</p>
+          <p className="mt-2 text-sm font-medium text-[#EEEEEE]">{event.body}</p>
           <div className="mt-4 flex gap-2">
             <button
               type="button"
@@ -137,7 +139,7 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
                 sound.click();
                 onDismissRef.current('Suspicious denial recorded.');
               }}
-              className="min-h-[44px] flex-1 rounded-md border border-[#3F4451] bg-[#1D2129] px-3 py-2 text-xs font-semibold text-[#F2F0EB] transition-colors hover:border-[#EF4444] active:scale-[0.98]"
+              className="min-h-[44px] flex-1 rounded border border-[#333333] bg-[#222222] px-3 py-2 text-xs font-semibold text-[#EEEEEE] transition-colors hover:border-[#666666]"
             >
               No, I am working
             </button>
@@ -145,9 +147,9 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
               type="button"
               onClick={() => {
                 sound.click();
-                onDismissRef.current('Honesty respected. Returning to your torment.');
+                onDismissRef.current('Honesty respected. Returning to verification.');
               }}
-              className="min-h-[44px] flex-1 rounded-md bg-[#DC2626] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#B91C1C] active:scale-[0.98]"
+              className="min-h-[44px] flex-1 rounded bg-[#B84B4B] px-3 py-2 text-xs font-semibold text-[#EEEEEE] transition-colors hover:bg-[#A03E3E]"
             >
               Yes, send help
             </button>
@@ -157,35 +159,37 @@ export const ChaosEventOverlay: React.FC<ChaosEventOverlayProps> = ({
 
       {event.type === 'fake-success' && (
         <div
-          className={`w-full max-w-sm rounded-md border-2 p-6 text-center shadow-2xl transition-colors duration-150 ${
+          className={`w-full max-w-sm rounded-md border p-6 text-center transition-colors duration-150 ${
             betrayed
-              ? 'animate-shake border-[#DC2626] bg-[#1C0D0F]'
-              : 'border-[#22C55E] bg-[#0D1E14]'
+              ? 'animate-shake border-[#B84B4B] bg-[#191919]'
+              : 'border-[#4E8A63] bg-[#16211A]'
           }`}
         >
           {!betrayed ? (
             <>
-              <CheckCircle2 className="mx-auto h-12 w-12 text-[#22C55E]" />
-              <h3 className="mt-3 font-display text-xl font-bold text-[#DCFCE7]">
-                HUMAN VERIFIED!
+              <CheckCircle2 className="mx-auto h-10 w-10 text-[#89B898]" />
+              <h3 className="mt-3 text-lg font-semibold text-[#EEEEEE]">
+                Verification successful.
               </h3>
-              <p className="mt-1 text-xs text-[#86EFAC]">Unlocking the entire internet...</p>
+              <p className="mt-1 text-xs text-[#89B898]">
+                Original identity could not be confirmed...
+              </p>
             </>
           ) : (
             <>
-              <AlertTriangle className="mx-auto h-12 w-12 text-[#EF4444]" />
-              <h3 className="mt-3 font-display text-xl font-bold text-[#FCA5A5]">
-                JUST KIDDING.
+              <AlertTriangle className="mx-auto h-10 w-10 text-[#B84B4B]" />
+              <h3 className="mt-3 text-lg font-semibold text-[#EEEEEE]">
+                Just kidding.
               </h3>
-              <p className="mt-1 text-xs text-[#F2F0EB]">
-                Did you really think it would be that easy?
+              <p className="mt-1 text-xs text-[#929292]">
+                Did you really think verification ends that easily?
               </p>
               <button
                 type="button"
-                onClick={() => onDismissRef.current('You passed! Just kidding.')}
-                className="mt-4 min-h-[44px] rounded-md border border-[#DC2626]/60 bg-[#2A1215] px-4 py-1.5 text-xs font-semibold text-[#FCA5A5] transition-colors hover:bg-[#DC2626] hover:text-white active:scale-[0.98]"
+                onClick={() => onDismissRef.current('Verification successful. Just kidding.')}
+                className="mt-4 min-h-[44px] rounded border border-[#333333] bg-[#222222] px-4 py-1.5 text-xs font-semibold text-[#EEEEEE] transition-colors hover:border-[#B84B4B]"
               >
-                Ugh, Continue
+                Continue
               </button>
             </>
           )}

@@ -3,19 +3,23 @@ import { formatDuration } from '../game/engine';
 
 interface PauseModalProps {
   levelNumber: number;
+  isEndless?: boolean;
   elapsedSeconds: number;
   chaosLevel: number;
   onResume: () => void;
   onRestart: () => void;
+  onChangeLevel: () => void;
   onTitle: () => void;
 }
 
 export const PauseModal: React.FC<PauseModalProps> = ({
   levelNumber,
+  isEndless = false,
   elapsedSeconds,
   chaosLevel,
   onResume,
   onRestart,
+  onChangeLevel,
   onTitle,
 }) => {
   return (
@@ -23,35 +27,37 @@ export const PauseModal: React.FC<PauseModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Verification Paused"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
     >
-      <div className="w-full max-w-sm rounded-lg border border-[#2C313C] bg-[#14161A] p-6 shadow-2xl">
-        <div className="font-mono text-xs uppercase tracking-wider text-[#EF4444]">
-          Session Suspended
+      <div className="animate-stage-enter w-full max-w-sm rounded-md border border-[#333333] bg-[#191919] p-6">
+        <div className="font-mono text-[11px] uppercase tracking-wider text-[#929292]">
+          Session Paused
         </div>
-        <h2 className="mt-1 font-display text-2xl font-bold text-[#F2F0EB]">
-          Taking a Breather?
+        <h2 className="mt-1 text-xl font-semibold text-[#EEEEEE]">
+          Verification Suspended
         </h2>
-        <p className="mt-1 text-xs text-[#9BA1AE]">
-          We will keep judging you patiently until you resume.
+        <p className="mt-1 text-xs text-[#929292]">
+          Timers are frozen. Your session remains open in the background.
         </p>
 
-        <div className="mt-5 grid grid-cols-3 gap-2 border-y border-[#232730] py-3 text-center">
+        <div className="mt-5 grid grid-cols-3 gap-2 border-y border-[#262626] py-3 text-center">
           <div>
-            <div className="font-mono text-[10px] uppercase text-[#717786]">Stage</div>
-            <div className="font-mono-tabular text-base font-bold text-[#F2F0EB]">
-              {levelNumber}/12
+            <div className="font-mono text-[10px] uppercase text-[#929292]">
+              {isEndless ? 'Wave' : 'Stage'}
+            </div>
+            <div className="font-mono-tabular text-base font-semibold text-[#EEEEEE]">
+              {isEndless ? `${levelNumber} / ∞` : `${levelNumber}/12`}
             </div>
           </div>
           <div>
-            <div className="font-mono text-[10px] uppercase text-[#717786]">Time</div>
-            <div className="font-mono-tabular text-base font-bold text-[#F2F0EB]">
+            <div className="font-mono text-[10px] uppercase text-[#929292]">Time</div>
+            <div className="font-mono-tabular text-base font-semibold text-[#EEEEEE]">
               {formatDuration(elapsedSeconds)}
             </div>
           </div>
           <div>
-            <div className="font-mono text-[10px] uppercase text-[#717786]">Chaos</div>
-            <div className="font-mono-tabular text-base font-bold text-[#EF4444]">
+            <div className="font-mono text-[10px] uppercase text-[#929292]">Chaos</div>
+            <div className="font-mono-tabular text-base font-semibold text-[#B84B4B]">
               {chaosLevel}%
             </div>
           </div>
@@ -61,21 +67,28 @@ export const PauseModal: React.FC<PauseModalProps> = ({
           <button
             type="button"
             onClick={onResume}
-            className="min-h-[44px] w-full rounded-md bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#B91C1C]"
+            className="min-h-[44px] w-full rounded bg-[#B84B4B] px-4 py-2.5 text-sm font-semibold text-[#EEEEEE] transition-colors hover:bg-[#A03E3E]"
           >
             Resume Verification
           </button>
           <button
             type="button"
             onClick={onRestart}
-            className="min-h-[44px] w-full rounded-md border border-[#2C313C] bg-[#1A1D24] px-4 py-2.5 text-sm font-medium text-[#F2F0EB] hover:border-[#525A6B]"
+            className="min-h-[44px] w-full rounded border border-[#333333] bg-[#222222] px-4 py-2.5 text-sm font-medium text-[#EEEEEE] transition-colors hover:border-[#666666]"
           >
             Restart From Stage 1
           </button>
           <button
             type="button"
+            onClick={onChangeLevel}
+            className="min-h-[44px] w-full rounded border border-[#333333] bg-[#191919] px-4 py-2.5 text-sm font-medium text-[#EEEEEE] transition-colors hover:border-[#666666] hover:bg-[#222222]"
+          >
+            Select Mode / Level
+          </button>
+          <button
+            type="button"
             onClick={onTitle}
-            className="min-h-[44px] w-full rounded-md px-4 py-2 text-xs font-medium text-[#9BA1AE] hover:text-[#F2F0EB]"
+            className="min-h-[44px] w-full rounded px-4 py-2 text-xs font-medium text-[#929292] transition-colors hover:text-[#EEEEEE]"
           >
             Return to Title
           </button>

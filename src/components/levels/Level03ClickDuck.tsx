@@ -48,6 +48,7 @@ function DuckSvg({ real, tired }: { real: boolean; tired: boolean }) {
 }
 
 export const Level03ClickDuck: React.FC<LevelComponentProps> = ({
+  isPaused,
   onSuccess,
   onFail,
   onChaosSpike,
@@ -63,6 +64,7 @@ export const Level03ClickDuck: React.FC<LevelComponentProps> = ({
   const isTired = dodges >= MAX_DODGES;
 
   const dodgeRealDuck = () => {
+    if (isPaused) return;
     const now = Date.now();
     if (now - lastDodgeAt.current < 260) return;
     lastDodgeAt.current = now;
@@ -95,6 +97,7 @@ export const Level03ClickDuck: React.FC<LevelComponentProps> = ({
   };
 
   const handleDuckClick = (duck: DuckEntity) => {
+    if (isPaused) return;
     if (!duck.isReal) {
       sound.wrong();
       onFail('You clicked an obvious decoy duck. Look at the label stamped on its wing.');
@@ -110,7 +113,7 @@ export const Level03ClickDuck: React.FC<LevelComponentProps> = ({
   };
 
   const handleArenaPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (isTired || e.pointerType === 'touch') return;
+    if (isPaused || isTired || e.pointerType === 'touch') return;
     const rect = arenaRef.current?.getBoundingClientRect();
     if (!rect) return;
     const real = ducks.find((d) => d.isReal);
@@ -125,9 +128,9 @@ export const Level03ClickDuck: React.FC<LevelComponentProps> = ({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between text-xs text-[#9BA1AE]">
+      <div className="flex items-center justify-between text-xs text-[#929292]">
         <span>{statusLine}</span>
-        <span className="font-mono-tabular text-[#F2F0EB]">
+        <span className="font-mono-tabular text-[#EEEEEE]">
           Stamina: {Math.max(0, MAX_DODGES - dodges)}/{MAX_DODGES}
         </span>
       </div>
@@ -135,14 +138,13 @@ export const Level03ClickDuck: React.FC<LevelComponentProps> = ({
       <div
         ref={arenaRef}
         onPointerMove={handleArenaPointerMove}
-        className="relative h-64 w-full touch-none select-none overflow-hidden rounded-md border border-[#262B35] bg-[#101217] sm:h-72"
+        className="relative h-64 w-full touch-none select-none overflow-hidden rounded-md border border-[#333333] bg-[#141414] sm:h-72"
       >
-        {/* Pond radar grid lines */}
         <div
           className="pointer-events-none absolute inset-0 opacity-20"
           style={{
             backgroundImage:
-              'radial-gradient(circle at center, #334155 1px, transparent 1px)',
+              'radial-gradient(circle at center, #444444 1px, transparent 1px)',
             backgroundSize: '24px 24px',
           }}
         />
@@ -158,11 +160,13 @@ export const Level03ClickDuck: React.FC<LevelComponentProps> = ({
               top: `${duck.y}%`,
               transform: 'translate(-50%, -50%)',
             }}
-            className="absolute flex min-h-[56px] min-w-[56px] flex-col items-center justify-center rounded-full p-1 transition-all duration-200 ease-out hover:scale-110 focus-visible:outline-2 focus-visible:outline-[#EF4444]"
+            className={`absolute flex min-h-[56px] min-w-[56px] flex-col items-center justify-center rounded-full p-1 transition-all duration-200 ease-out hover:scale-110 focus-visible:outline-2 focus-visible:outline-[#B84B4B] ${
+              duck.isReal ? 'z-10' : 'z-0'
+            }`}
           >
             <DuckSvg real={duck.isReal} tired={duck.isReal && isTired} />
             {duck.isReal && isTired && (
-              <span className="mt-0.5 rounded bg-[#DC2626] px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
+              <span className="mt-0.5 rounded bg-[#B84B4B] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#EEEEEE]">
                 TIRED
               </span>
             )}
@@ -170,7 +174,7 @@ export const Level03ClickDuck: React.FC<LevelComponentProps> = ({
         ))}
       </div>
 
-      <p className="text-xs text-[#9BA1AE]">
+      <p className="text-xs text-[#929292]">
         {isTired
           ? 'The duck is out of breath! Click it now before it regains its ego.'
           : 'Chase the real duck until its stamina drops to zero. Ignore clones.'}

@@ -29,13 +29,22 @@ const REQUIRED = ITEMS.filter((i) => i.isTarget).map((i) => i.id);
 
 export const Level01TrafficLights: React.FC<LevelComponentProps> = ({
   levelAttempts,
+  shuffleSeed,
   onSuccess,
   onFail,
 }) => {
   const [selected, setSelected] = useState<string[]>([]);
   const [magnify, setMagnify] = useState(false);
 
-  const orderedItems = useMemo(() => ITEMS, []);
+  const orderedItems = useMemo(() => {
+    if (shuffleSeed === 0) return ITEMS;
+    const copy = [...ITEMS];
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = (shuffleSeed * (i + 7)) % (i + 1);
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }, [shuffleSeed]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -66,9 +75,9 @@ export const Level01TrafficLights: React.FC<LevelComponentProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#9BA1AE]">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#929292]">
         <span>
-          Selected: <strong className="font-mono-tabular text-[#F2F0EB]">{selected.length}</strong>
+          Selected: <strong className="font-mono-tabular text-[#EEEEEE]">{selected.length}</strong>
         </span>
         {levelAttempts >= 1 && (
           <button
@@ -77,9 +86,9 @@ export const Level01TrafficLights: React.FC<LevelComponentProps> = ({
               sound.click();
               setMagnify((m) => !m);
             }}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-[#2C313C] bg-[#1A1D24] px-3 py-1.5 text-xs font-medium text-[#F2F0EB] transition-colors hover:border-[#DC2626] hover:text-white active:scale-[0.98]"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-[#333333] bg-[#222222] px-3 py-1.5 text-xs font-medium text-[#EEEEEE] transition-colors hover:border-[#B84B4B] hover:text-white active:scale-[0.98]"
           >
-            <Search className="h-3.5 w-3.5 text-[#EF4444]" />
+            <Search className="h-3.5 w-3.5 text-[#D48A8A]" />
             {magnify ? 'Disable Squint Lens' : 'Enable Squint Lens'}
           </button>
         )}
@@ -95,15 +104,15 @@ export const Level01TrafficLights: React.FC<LevelComponentProps> = ({
               onClick={() => toggle(item.id)}
               aria-pressed={isSelected}
               aria-label={item.label}
-              className={`group relative aspect-square w-full overflow-hidden rounded-md border-2 transition-transform duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#EF4444] ${
+              className={`group relative aspect-square w-full overflow-hidden rounded-md border-2 transition-transform duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B84B4B] ${
                 isSelected
-                  ? 'scale-[0.96] border-[#EF4444] ring-2 ring-[#EF4444]/40'
-                  : 'border-[#252A34] hover:border-[#525A6B]'
+                  ? 'scale-[0.96] border-[#B84B4B] ring-1 ring-[#B84B4B]/40'
+                  : 'border-[#333333] hover:border-[#555555]'
               }`}
             >
               <CaptchaTileArt kind={item.art} alt={item.label} magnified={magnify} />
               {isSelected && (
-                <span className="animate-pop absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#DC2626] text-white shadow-md">
+                <span className="animate-pop absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#B84B4B] text-[#EEEEEE]">
                   <Check className="h-3.5 w-3.5 stroke-[3]" />
                 </span>
               )}
@@ -113,13 +122,13 @@ export const Level01TrafficLights: React.FC<LevelComponentProps> = ({
       </div>
 
       <div className="flex items-center justify-between pt-1">
-        <span className="text-xs text-[#9BA1AE]">
+        <span className="text-xs text-[#929292]">
           {levelAttempts > 0 ? 'Hint: Tiny decorative signals still count.' : 'Click every qualifying tile.'}
         </span>
         <button
           type="button"
           onClick={handleVerify}
-          className="min-h-[44px] rounded-md bg-[#DC2626] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C] active:scale-[0.98]"
+          className="min-h-[44px] rounded-md bg-[#B84B4B] px-6 py-2.5 text-sm font-semibold text-[#EEEEEE] transition-colors hover:bg-[#A03E3E] active:scale-[0.98]"
         >
           Verify
         </button>

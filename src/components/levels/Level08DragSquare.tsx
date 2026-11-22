@@ -11,6 +11,7 @@ const TARGET_SPOTS = [
 ];
 
 export const Level08DragSquare: React.FC<LevelComponentProps> = ({
+  isPaused,
   onSuccess,
   onChaosSpike,
 }) => {
@@ -25,7 +26,7 @@ export const Level08DragSquare: React.FC<LevelComponentProps> = ({
 
   const updatePointer = (clientX: number, clientY: number) => {
     const rect = arenaRef.current?.getBoundingClientRect();
-    if (!rect || completed) return;
+    if (!rect || completed || isPaused) return;
     const x = Math.max(8, Math.min(92, ((clientX - rect.left) / rect.width) * 100));
     const y = Math.max(12, Math.min(88, ((clientY - rect.top) / rect.height) * 100));
     setBoxPos({ x, y });
@@ -50,7 +51,7 @@ export const Level08DragSquare: React.FC<LevelComponentProps> = ({
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (completed) return;
+    if (completed || isPaused) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     sound.click();
     setDragging(true);
@@ -58,7 +59,7 @@ export const Level08DragSquare: React.FC<LevelComponentProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (!dragging) return;
+    if (!dragging || isPaused) return;
     updatePointer(e.clientX, e.clientY);
   };
 
@@ -68,7 +69,7 @@ export const Level08DragSquare: React.FC<LevelComponentProps> = ({
 
   // Keyboard accessibility support so users can also nudge with arrow keys
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (completed) return;
+    if (completed || isPaused) return;
     const step = 7;
     let nx = boxPos.x;
     let ny = boxPos.y;
@@ -93,18 +94,17 @@ export const Level08DragSquare: React.FC<LevelComponentProps> = ({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between text-xs text-[#9BA1AE]">
+      <div className="flex items-center justify-between text-xs text-[#929292]">
         <span>{currentTarget.note}</span>
-        <span className="font-mono-tabular text-[#F2F0EB]">
+        <span className="font-mono-tabular text-[#EEEEEE]">
           Dodges: {phase}/{TARGET_SPOTS.length - 1}
         </span>
       </div>
 
       <div
         ref={arenaRef}
-        className="relative h-64 w-full touch-none select-none overflow-hidden rounded-md border border-[#2C313C] bg-[#0F1116] sm:h-72"
+        className="relative h-64 w-full touch-none select-none overflow-hidden rounded-md border border-[#333333] bg-[#141414] sm:h-72"
       >
-        {/* Target socket */}
         <div
           style={{
             left: `${currentTarget.x}%`,
@@ -115,16 +115,19 @@ export const Level08DragSquare: React.FC<LevelComponentProps> = ({
           }}
           className={`pointer-events-none absolute flex items-center justify-center rounded-md border-2 border-dashed transition-all duration-200 ${
             completed
-              ? 'border-[#22C55E] bg-[#22C55E]/20'
-              : 'border-[#EF4444] bg-[#DC2626]/10'
+              ? 'border-[#4E8A63] bg-[#4E8A63]/20'
+              : 'border-[#B84B4B] bg-[#B84B4B]/10'
           }`}
         >
-          <span className="font-mono text-[10px] font-semibold tracking-wider text-[#FCA5A5]">
+          <span
+            className={`font-mono text-[10px] font-semibold tracking-wider ${
+              completed ? 'text-[#89B898]' : 'text-[#D48A8A]'
+            }`}
+          >
             {completed ? 'LOCKED' : 'DROP'}
           </span>
         </div>
 
-        {/* Draggable cube */}
         <button
           type="button"
           onPointerDown={handlePointerDown}
@@ -136,17 +139,17 @@ export const Level08DragSquare: React.FC<LevelComponentProps> = ({
           style={{
             left: `${boxPos.x}%`,
             top: `${boxPos.y}%`,
-            transform: `translate(-50%, -50%) scale(${dragging ? 1.08 : 1})`,
+            transform: `translate(-50%, -50%) scale(${dragging ? 1.06 : 1})`,
           }}
-          className={`absolute flex h-12 w-12 items-center justify-center rounded-md border-2 bg-[#F2F0EB] text-[#0B0C0E] shadow-lg transition-transform duration-75 focus-visible:outline-2 focus-visible:outline-[#EF4444] ${
-            dragging ? 'cursor-grabbing border-[#EF4444]' : 'cursor-grab border-[#9BA1AE]'
+          className={`absolute flex h-12 w-12 items-center justify-center rounded-md border-2 bg-[#EEEEEE] text-[#111111] transition-transform duration-75 focus-visible:outline-2 focus-visible:outline-[#B84B4B] ${
+            dragging ? 'cursor-grabbing border-[#B84B4B]' : 'cursor-grab border-[#929292]'
           }`}
         >
           <Grip className="h-5 w-5" />
         </button>
       </div>
 
-      <p className="text-xs text-[#9BA1AE]">
+      <p className="text-xs text-[#929292]">
         Drag with mouse/touch (or focus the cube and press Arrow keys).
       </p>
     </div>

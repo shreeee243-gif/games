@@ -1,22 +1,31 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 :root {
   color-scheme: dark;
+  --cfh-bg: #111111;
+  --cfh-surface: #191919;
+  --cfh-surface-alt: #222222;
+  --cfh-text: #eeeeee;
+  --cfh-muted: #929292;
+  --cfh-border: #333333;
+  --cfh-warning: #b84b4b;
+  --cfh-warning-hover: #a03e3e;
+  --cfh-success: #4e8a63;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #0b0c0e;
-  color: #f2f0eb;
+  background-color: var(--cfh-bg);
+  color: var(--cfh-text);
   overflow-x: hidden;
   overscroll-behavior: none;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.005em;
 }
 
 .font-display {
@@ -28,98 +37,78 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Subtle security terminal grid background */
+/* Minimal, understated corporate verification canvas — no glows or animated grids */
 .captcha-bg-grid {
-  background-image:
-    radial-gradient(circle at 50% 25%, rgba(220, 38, 38, 0.08) 0%, rgba(11, 12, 14, 0) 60%),
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 40px 40px, 40px 40px;
+  background-color: var(--cfh-bg);
 }
 
-/* CRT scanline overlay scaled by chaos */
-.crt-scanlines {
-  background-image: repeating-linear-gradient(
-    0deg,
-    rgba(0, 0, 0, 0.16) 0px,
-    rgba(0, 0, 0, 0.16) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  pointer-events: none;
-}
-
-/* Custom chaotic cursors (SVG data URIs) */
+/* Custom chaotic cursors (SVG data URIs) used strictly during brief rare chaos events */
 .cursor-chaos-duck,
 .cursor-chaos-duck * {
-  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><circle cx='16' cy='18' r='10' fill='%23facc15' stroke='%230b0c0e' stroke-width='2'/><polygon points='25,16 31,18 25,21' fill='%23ea580c'/><circle cx='19' cy='15' r='2' fill='%230b0c0e'/></svg>") 16 16, pointer !important;
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><circle cx='16' cy='18' r='10' fill='%23d4b44a' stroke='%23111111' stroke-width='2'/><polygon points='25,16 31,18 25,21' fill='%23b8683a'/><circle cx='19' cy='15' r='2' fill='%23111111'/></svg>") 16 16, pointer !important;
 }
 
 .cursor-chaos-warn,
 .cursor-chaos-warn * {
-  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><polygon points='16,3 29,27 3,27' fill='%23dc2626' stroke='%23f2f0eb' stroke-width='2'/><rect x='14.5' y='11' width='3' height='8' fill='%23f2f0eb'/><circle cx='16' cy='23' r='1.8' fill='%23f2f0eb'/></svg>") 16 16, crosshair !important;
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><polygon points='16,3 29,27 3,27' fill='%23b84b4b' stroke='%23eeeeee' stroke-width='2'/><rect x='14.5' y='11' width='3' height='8' fill='%23eeeeee'/><circle cx='16' cy='23' r='1.8' fill='%23eeeeee'/></svg>") 16 16, crosshair !important;
 }
 
-@keyframes shake-hard {
-  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
-  15% { transform: translate3d(-7px, -2px, 0) rotate(-0.8deg); }
-  30% { transform: translate3d(7px, 2px, 0) rotate(0.8deg); }
-  45% { transform: translate3d(-5px, 1px, 0) rotate(-0.5deg); }
-  60% { transform: translate3d(5px, -1px, 0) rotate(0.5deg); }
-  75% { transform: translate3d(-3px, 0, 0) rotate(0deg); }
+@keyframes shake-subtle {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-4px, 0, 0); }
+  45% { transform: translate3d(4px, 0, 0); }
+  70% { transform: translate3d(-2px, 0, 0); }
+  88% { transform: translate3d(2px, 0, 0); }
 }
 
-@keyframes glitch-flicker {
-  0%, 92%, 100% { opacity: 1; transform: translate3d(0, 0, 0); }
-  94% { opacity: 0.72; transform: translate3d(-2px, 0, 0); }
-  96% { opacity: 0.95; transform: translate3d(2px, -1px, 0); }
-  98% { opacity: 0.8; transform: translate3d(-1px, 1px, 0); }
+@keyframes text-corrupt {
+  0%, 94%, 100% { opacity: 1; transform: translate3d(0, 0, 0); }
+  96% { opacity: 0.65; transform: translate3d(-1px, 0, 0); }
+  98% { opacity: 0.92; transform: translate3d(1px, 0, 0); }
 }
 
 @keyframes sonar-ping {
-  0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; }
-  100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+  0% { transform: translate(-50%, -50%) scale(0.25); opacity: 0.85; }
+  100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
 }
 
 @keyframes stamp-slam {
-  0% { opacity: 0; transform: scale(2.1) rotate(-14deg); }
-  65% { opacity: 1; transform: scale(0.95) rotate(-6deg); }
-  100% { opacity: 1; transform: scale(1) rotate(-7deg); }
+  0% { opacity: 0; transform: scale(1.18) rotate(-3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(-2deg); }
 }
 
 @keyframes stage-enter {
-  0% { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.99); }
-  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  0% { opacity: 0; transform: translate3d(0, 5px, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @keyframes badge-pop {
-  0% { opacity: 0; transform: scale(0.5); }
-  70% { opacity: 1; transform: scale(1.14); }
+  0% { opacity: 0; transform: scale(0.75); }
   100% { opacity: 1; transform: scale(1); }
 }
 
 .animate-shake {
-  animation: shake-hard 0.36s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  animation: shake-subtle 0.28s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
 .animate-glitch {
-  animation: glitch-flicker 3.2s infinite;
+  animation: text-corrupt 5.5s infinite;
 }
 
 .animate-sonar {
-  animation: sonar-ping 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: sonar-ping 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-stamp {
-  animation: stamp-slam 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: stamp-slam 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-stage-enter {
-  animation: stage-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: stage-enter 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-pop {
-  animation: badge-pop 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: badge-pop 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -12,6 +12,7 @@ interface Ping {
 
 export const Level05InvisibleObject: React.FC<LevelComponentProps> = ({
   runSeed,
+  isPaused,
   onSuccess,
   onFail,
 }) => {
@@ -40,7 +41,7 @@ export const Level05InvisibleObject: React.FC<LevelComponentProps> = ({
   }, []);
 
   const handleVoidClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (revealed) return;
+    if (isPaused || revealed) return;
     const rect = boxRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = ((e.clientX - rect.left) / rect.width) * 100;
@@ -67,17 +68,17 @@ export const Level05InvisibleObject: React.FC<LevelComponentProps> = ({
   };
 
   const heatColor = (heat: HeatZone) => {
-    if (heat === 'hit') return 'border-[#22C55E]';
-    if (heat === 'scalding') return 'border-[#EF4444]';
-    if (heat === 'warm') return 'border-[#F59E0B]';
-    return 'border-[#64748B]';
+    if (heat === 'hit') return 'border-[#4E8A63]';
+    if (heat === 'scalding') return 'border-[#B84B4B]';
+    if (heat === 'warm') return 'border-[#B58B4B]';
+    return 'border-[#6E6E6E]';
   };
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="font-medium text-[#F2F0EB]">{hint}</span>
-        <span className="shrink-0 font-mono-tabular text-[#9BA1AE]">Probes: {misses}</span>
+        <span className="font-medium text-[#EEEEEE]">{hint}</span>
+        <span className="shrink-0 font-mono-tabular text-[#929292]">Probes: {misses}</span>
       </div>
 
       <button
@@ -87,24 +88,22 @@ export const Level05InvisibleObject: React.FC<LevelComponentProps> = ({
         data-target-y={target.y}
         onClick={handleVoidClick}
         aria-label="Dark void containing an invisible bicycle. Click to probe."
-        className="relative block h-64 w-full touch-none select-none overflow-hidden rounded-md border border-[#2C313C] bg-[#0B0D11] text-left focus-visible:outline-2 focus-visible:outline-[#EF4444] sm:h-72"
+        className="relative block h-64 w-full touch-none select-none overflow-hidden rounded-md border border-[#333333] bg-[#121212] text-left focus-visible:outline-2 focus-visible:outline-[#B84B4B] sm:h-72"
       >
-        {/* Subtle tactical radar crosshair lines */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-25"
+          className="pointer-events-none absolute inset-0 opacity-20"
           style={{
             backgroundImage:
-              'linear-gradient(to right, rgba(148,163,184,0.14) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.14) 1px, transparent 1px)',
+              'linear-gradient(to right, rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.12) 1px, transparent 1px)',
             backgroundSize: '25% 25%',
           }}
         />
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="font-mono text-xs tracking-widest text-[#333B4B]">
+          <span className="font-mono text-xs tracking-widest text-[#3D3D3D]">
             [ 100% GENUINE INVISIBLE BICYCLE INSIDE ]
           </span>
         </div>
 
-        {/* Faint shimmer clue if player gets scalding hot */}
         {(revealed || pings.some((p) => p.heat === 'scalding')) && (
           <svg
             viewBox="0 0 120 70"
@@ -118,9 +117,9 @@ export const Level05InvisibleObject: React.FC<LevelComponentProps> = ({
             }`}
             aria-hidden="true"
           >
-            <circle cx="28" cy="48" r="16" fill="none" stroke={revealed ? '#22C55E' : '#EF4444'} strokeWidth="2.5" strokeDasharray={revealed ? '' : '4 3'} />
-            <circle cx="92" cy="48" r="16" fill="none" stroke={revealed ? '#22C55E' : '#EF4444'} strokeWidth="2.5" strokeDasharray={revealed ? '' : '4 3'} />
-            <path d="M28 48 L52 24 L82 24 L92 48 M52 24 L60 48 L28 48 M82 24 L86 14 L96 14" fill="none" stroke={revealed ? '#22C55E' : '#EF4444'} strokeWidth="2.5" />
+            <circle cx="28" cy="48" r="16" fill="none" stroke={revealed ? '#4E8A63' : '#B84B4B'} strokeWidth="2.5" strokeDasharray={revealed ? '' : '4 3'} />
+            <circle cx="92" cy="48" r="16" fill="none" stroke={revealed ? '#4E8A63' : '#B84B4B'} strokeWidth="2.5" strokeDasharray={revealed ? '' : '4 3'} />
+            <path d="M28 48 L52 24 L82 24 L92 48 M52 24 L60 48 L28 48 M82 24 L86 14 L96 14" fill="none" stroke={revealed ? '#4E8A63' : '#B84B4B'} strokeWidth="2.5" />
           </svg>
         )}
 
@@ -138,14 +137,14 @@ export const Level05InvisibleObject: React.FC<LevelComponentProps> = ({
                 top: `${ping.y}%`,
                 transform: 'translate(-50%, -50%)',
               }}
-              className="pointer-events-none absolute h-2 w-2 rounded-full bg-[#F2F0EB]/60"
+              className="pointer-events-none absolute h-2 w-2 rounded-full bg-[#EEEEEE]/60"
             />
           </React.Fragment>
         ))}
       </button>
 
-      <p className="text-xs text-[#9BA1AE]">
-        Tip: Red rings mean scalding hot. Click directly on the glowing outline once you spot it.
+      <p className="text-xs text-[#929292]">
+        Tip: Red rings mean scalding hot. Click directly on the outline once you locate it.
       </p>
     </div>
   );

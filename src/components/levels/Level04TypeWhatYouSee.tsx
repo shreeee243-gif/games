@@ -42,7 +42,7 @@ export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
   const handleLock = () => {
     sound.click();
     setLocked(true);
-    setNote('Hey! Who told you about the ink-freeze bolt? Fine, it is locked.');
+    setNote('Ink locked. Note: previous session paused at character 4 as well.');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -53,7 +53,10 @@ export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
       return;
     }
     if (cleaned === currentCode) {
-      onSuccess('Accurate transcription despite active sabotage. Impressive.');
+      onSuccess(
+        'Accurate transcription despite active sabotage. Impressive.',
+        locked ? 'ink-bolt' : undefined,
+      );
       return;
     }
     if (codeStages.includes(cleaned)) {
@@ -67,7 +70,7 @@ export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="relative overflow-hidden rounded-md border border-[#2C313C] bg-[#0F1116] p-5">
+      <div className="relative overflow-hidden rounded-md border border-[#333333] bg-[#141414] p-5">
         <button
           type="button"
           onClick={handleLock}
@@ -75,8 +78,8 @@ export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
           title={locked ? 'Text frozen' : 'Freeze mutating text'}
           className={`absolute right-2.5 top-2.5 inline-flex min-h-[40px] items-center gap-1 rounded border px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
             locked
-              ? 'border-[#22C55E]/50 bg-[#0D2818] text-[#86EFAC]'
-              : 'border-[#2A2F3A] bg-[#171A21] text-[#9BA1AE] hover:border-[#EF4444] hover:text-white'
+              ? 'border-[#4E8A63]/50 bg-[#18231C] text-[#89B898]'
+              : 'border-[#333333] bg-[#222222] text-[#929292] hover:border-[#B84B4B] hover:text-[#EEEEEE]'
           }`}
         >
           {locked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
@@ -89,10 +92,10 @@ export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
           role="img"
           aria-label={`Distorted verification text reading ${currentCode}`}
         >
-          <rect width="320" height="90" fill="#12151C" rx="4" />
-          <path d="M12 24 Q90 68 180 28 T308 52" stroke="#DC2626" strokeWidth="2" fill="none" opacity="0.55" />
-          <path d="M18 66 Q120 14 210 64 T306 24" stroke="#64748B" strokeWidth="1.5" fill="none" opacity="0.5" />
-          <line x1="0" y1="45" x2="320" y2="41" stroke="#EF4444" strokeWidth="1" strokeDasharray="6 4" opacity="0.5" />
+          <rect width="320" height="90" fill="#181818" rx="4" />
+          <path d="M12 24 Q90 68 180 28 T308 52" stroke="#B84B4B" strokeWidth="2" fill="none" opacity="0.5" />
+          <path d="M18 66 Q120 14 210 64 T306 24" stroke="#6E6E6E" strokeWidth="1.5" fill="none" opacity="0.45" />
+          <line x1="0" y1="45" x2="320" y2="41" stroke="#B84B4B" strokeWidth="1" strokeDasharray="6 4" opacity="0.45" />
           {currentCode.split('').map((ch, idx) => {
             const x = 36 + idx * 46;
             const y = 58 + (idx % 2 === 0 ? -5 : 6);
@@ -104,7 +107,7 @@ export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
                 x={x}
                 y={y}
                 transform={`rotate(${rot} ${x} ${y})`}
-                fill={isMutatedTail ? '#FCA5A5' : '#F2F0EB'}
+                fill={isMutatedTail ? '#D48A8A' : '#EEEEEE'}
                 fontFamily="IBM Plex Mono, monospace"
                 fontWeight="700"
                 fontSize="36"
@@ -116,7 +119,7 @@ export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
           })}
         </svg>
 
-        <p className="mt-2 text-center text-xs text-[#9BA1AE]">{note}</p>
+        <p className="mt-2 text-center text-xs text-[#929292]">{note}</p>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -131,11 +134,11 @@ export const Level04TypeWhatYouSee: React.FC<LevelComponentProps> = ({
           placeholder="Type the 6 characters..."
           autoComplete="off"
           spellCheck={false}
-          className="min-h-[44px] flex-1 rounded-md border border-[#2F3542] bg-[#111319] px-3.5 py-2 font-mono text-base uppercase tracking-[0.2em] text-[#F2F0EB] placeholder:tracking-normal placeholder:text-[#6B7280] focus:border-[#EF4444] focus:outline-none"
+          className="min-h-[44px] flex-1 rounded-md border border-[#333333] bg-[#141414] px-3.5 py-2 font-mono text-base uppercase tracking-[0.2em] text-[#EEEEEE] placeholder:tracking-normal placeholder:text-[#666666] focus:border-[#B84B4B] focus:outline-none"
         />
         <button
           type="submit"
-          className="min-h-[44px] rounded-md bg-[#DC2626] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C] active:scale-[0.98]"
+          className="min-h-[44px] rounded-md bg-[#B84B4B] px-6 py-2.5 text-sm font-semibold text-[#EEEEEE] transition-colors hover:bg-[#A03E3E] active:scale-[0.98]"
         >
           Verify
         </button>

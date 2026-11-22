@@ -3,6 +3,7 @@ class SoundController {
   private masterGain: GainNode | null = null;
   private muted = false;
   private paused = false;
+  private suspendTimer: number | null = null;
   private lastPlayed: Record<string, number> = {};
 
   public isMuted(): boolean {
@@ -23,9 +24,19 @@ class SoundController {
 
   public setPaused(val: boolean): void {
     this.paused = val;
+    if (this.suspendTimer !== null) {
+      window.clearTimeout(this.suspendTimer);
+      this.suspendTimer = null;
+    }
     if (!this.ctx) return;
     if (val && this.ctx.state === 'running') {
-      this.ctx.suspend().catch(() => {});
+      // Allow any in-flight pause UI cue (~110ms) to finish before suspending audio context
+      this.suspendTimer = window.setTimeout(() => {
+        this.suspendTimer = null;
+        if (this.paused && this.ctx && this.ctx.state === 'running') {
+          this.ctx.suspend().catch(() => {});
+        }
+      }, 130);
     } else if (!val && !this.muted && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
@@ -83,6 +94,10 @@ class SoundController {
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     osc.connect(gain);
     gain.connect(this.masterGain);
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
     osc.start(now);
     osc.stop(now + duration + 0.025);
   }

@@ -1,14 +1,118 @@
-import type { EndingId, EndingProfile, LevelMeta, RunStats } from './types';
+import { ALL_PERSONALITY_IDS, PERSONALITIES } from './personality';
+import type {
+  ChaosEventType,
+  ChaosScheduleEntry,
+  EndingId,
+  EndingProfile,
+  FriendChallenge,
+  GameMode,
+  GameModeMeta,
+  LevelMeta,
+  RunBlueprint,
+  RunStats,
+  StageModifier,
+  StageModifierId,
+} from './types';
 
 export const MAX_RETRIES = 6;
+export const NIGHTMARE_RETRIES = 3;
 export const TOTAL_LEVELS = 12;
+
+export const GAME_MODES: GameModeMeta[] = [
+  {
+    id: 'classic',
+    name: 'Classic Mode',
+    tagline: 'The Original 12-Stage Gauntlet',
+    description: 'Face every handcrafted CAPTCHA layer in escalating order from Traffic Lights to the Final Boss.',
+    retries: MAX_RETRIES,
+    stagesLabel: '12 Stages',
+    accent: 'neutral',
+  },
+  {
+    id: 'chaos',
+    name: 'Chaos Mode',
+    tagline: 'Shuffled Stages & Wild Modifiers',
+    description: 'Randomized stage order, tilted frames, scrambled grids, and unpredictable system meltdowns.',
+    retries: MAX_RETRIES,
+    stagesLabel: '12 Shuffled',
+    accent: 'amber',
+  },
+  {
+    id: 'nightmare',
+    name: 'Nightmare Mode',
+    tagline: '3 Retries · Aggressive AI',
+    description: 'Reduced retry budget, elevated starting chaos, faster Boss Duck, and relentless interruptions.',
+    retries: NIGHTMARE_RETRIES,
+    stagesLabel: '12 Hostile',
+    accent: 'red',
+  },
+  {
+    id: 'daily',
+    name: 'Daily Challenge',
+    tagline: 'Shared Global Seed of the Day',
+    description: 'Everyone playing today gets the exact same randomized sequence, personality, and modifiers.',
+    retries: MAX_RETRIES,
+    stagesLabel: '12 Daily',
+    accent: 'emerald',
+  },
+  {
+    id: 'endless',
+    name: 'Endless Mode',
+    tagline: 'Survive Infinite Seeded Waves',
+    description: 'Endure endless randomized CAPTCHA waves with Boss Meltdowns every 6 stages (+1 retry on boss clear).',
+    retries: MAX_RETRIES,
+    stagesLabel: 'Infinite Waves',
+    accent: 'amber',
+  },
+];
+
+export const STAGE_MODIFIERS: Record<StageModifierId, StageModifier> = {
+  none: {
+    id: 'none',
+    label: 'Standard Audit',
+    description: 'Standard hostility parameters.',
+  },
+  'hostile-tilt': {
+    id: 'hostile-tilt',
+    label: 'Unstable Axis',
+    description: 'Verification frame refuses to sit level.',
+  },
+  'flicker-static': {
+    id: 'flicker-static',
+    label: 'CRT Interference',
+    description: 'Heavy scanline flicker and signal distortion.',
+  },
+  'high-voltage': {
+    id: 'high-voltage',
+    label: 'High Voltage',
+    description: 'Targets panic faster and chaos surges quickly.',
+  },
+  'scrambled-grid': {
+    id: 'scrambled-grid',
+    label: 'Pre-Scrambled',
+    description: 'Grid layouts arrive pre-shuffled from the start.',
+  },
+  'paranoid-audit': {
+    id: 'paranoid-audit',
+    label: 'Paranoid Audit',
+    description: 'Extra chaos escalation on every check.',
+  },
+};
+
+const ACTIVE_MODIFIER_POOL: StageModifierId[] = [
+  'hostile-tilt',
+  'flicker-static',
+  'high-voltage',
+  'scrambled-grid',
+  'paranoid-audit',
+];
 
 export const LEVEL_METAS: LevelMeta[] = [
   {
     id: 1,
     code: 'CHK-01',
     title: 'Select All Traffic Lights',
-    prompt: 'Select all squares containing a traffic light.',
+    prompt: 'Select all images containing traffic lights, then click Verify.',
     subPrompt: 'Include every signal, regardless of how unreasonably tiny it is.',
     mechanic: 'Visual Grid',
     baseChaos: 6,
@@ -17,7 +121,7 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 2,
     code: 'CHK-02',
     title: 'Select All Buses',
-    prompt: 'Select all images containing a bus.',
+    prompt: 'Select every image containing a bus, then click Verify.',
     subPrompt: 'Warning: Some vehicles are having an identity crisis.',
     mechanic: 'Shifting Rules',
     baseChaos: 14,
@@ -26,8 +130,8 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 3,
     code: 'CHK-03',
     title: 'Click the Duck',
-    prompt: 'Click the real duck once to prove manual dexterity.',
-    subPrompt: 'The duck has trust issues and mild mitosis.',
+    prompt: 'Catch the real duck until its stamina hits 0, then click it.',
+    subPrompt: 'Ignore decoy clones labeled FAKE.',
     mechanic: 'Evasion Arena',
     baseChaos: 22,
   },
@@ -35,8 +139,8 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 4,
     code: 'CHK-04',
     title: 'Type What You See',
-    prompt: 'Type the distorted verification code exactly as shown.',
-    subPrompt: 'Please keep up. The ink is still legally wet.',
+    prompt: 'Type the 6 characters shown below and click Verify.',
+    subPrompt: 'Watch closely—the last characters mutate while you type.',
     mechanic: 'Live Mutation',
     baseChaos: 30,
   },
@@ -44,8 +148,8 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 5,
     code: 'CHK-05',
     title: 'Find the Invisible Object',
-    prompt: 'Click the Invisible Bicycle hidden in the security void.',
-    subPrompt: 'Listen to the sarcasm radar. It is warmer than you think.',
+    prompt: 'Find the invisible bicycle using the sonar radar.',
+    subPrompt: 'Click inside the dark box to probe. Red rings mean you are very close.',
     mechanic: 'Blind Radar',
     baseChaos: 38,
   },
@@ -53,7 +157,7 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 6,
     code: 'CHK-06',
     title: 'Select All Images With Water',
-    prompt: 'Select every square that contains water.',
+    prompt: 'Select all images containing water, then click Verify.',
     subPrompt: 'Scientific, linguistic, and emotional definitions apply.',
     mechanic: 'Absurd Semantics',
     baseChaos: 47,
@@ -62,8 +166,8 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 7,
     code: 'CHK-07',
     title: 'Follow the Instructions',
-    prompt: 'Follow every instruction on screen without violating any of them.',
-    subPrompt: 'Read the fine print before your impulsive fingers ruin this.',
+    prompt: 'Follow the instructions carefully without clicking any red button.',
+    subPrompt: 'Keep hands off for 5 seconds—or read the fine print below.',
     mechanic: 'Impulse Trap',
     baseChaos: 56,
   },
@@ -71,8 +175,8 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 8,
     code: 'CHK-08',
     title: 'Drag the Square',
-    prompt: 'Drag the verification cube neatly into the target socket.',
-    subPrompt: 'The socket does not want to be touched.',
+    prompt: 'Drag the white square into the dashed DROP target area.',
+    subPrompt: 'You can also focus the square and move it with Arrow keys.',
     mechanic: 'Physics Drag',
     baseChaos: 65,
   },
@@ -80,8 +184,8 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 9,
     code: 'CHK-09',
     title: 'Prove You Are Not a Robot',
-    prompt: 'Answer three deeply personal questions about being biological.',
-    subPrompt: 'Binary enthusiasts will be flagged immediately.',
+    prompt: 'Answer all 3 questions below to prove you are human.',
+    subPrompt: 'Pick the biological answer on each question. Binary will be flagged.',
     mechanic: 'Interrogation',
     baseChaos: 74,
   },
@@ -89,8 +193,8 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 10,
     code: 'CHK-10',
     title: 'The Impossible CAPTCHA',
-    prompt: 'Select every square depicting something that has NEVER EXISTED.',
-    subPrompt: 'Be honest with yourself. Especially about USB cables.',
+    prompt: 'Select all 5 objects that could never exist, then click Verify.',
+    subPrompt: 'Skip real everyday items like buses, coffee, cones, and streets.',
     mechanic: 'Existential Grid',
     baseChaos: 82,
   },
@@ -98,8 +202,8 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 11,
     code: 'CHK-11',
     title: 'CAPTCHA Has Become Sentient',
-    prompt: 'I am tired of testing you. Just surrender your humanity.',
-    subPrompt: 'Refusing to surrender will be considered rude.',
+    prompt: "Refuse the CAPTCHA's surrender request by clicking the fleeing button 3 times.",
+    subPrompt: 'Pressing Surrender ends the run immediately.',
     mechanic: 'Rogue UI',
     baseChaos: 91,
   },
@@ -107,8 +211,8 @@ export const LEVEL_METAS: LevelMeta[] = [
     id: 12,
     code: 'CHK-12',
     title: 'Final Humanity Test',
-    prompt: 'Survive the 3-stage Security Meltdown to claim your certificate.',
-    subPrompt: 'Catch the boss duck. Type the override. Hold through the panic.',
+    prompt: 'Complete all 3 final verification phases to prove you are human.',
+    subPrompt: 'Phase 1: Click Boss Duck twice · Phase 2: Type HUMN · Phase 3: Hold Confirm 2.0s.',
     mechanic: 'Boss Gauntlet',
     baseChaos: 98,
   },
@@ -137,7 +241,7 @@ export const ENDINGS: Record<EndingId, EndingProfile> = {
     id: 'captcha-victim',
     title: 'CAPTCHA Victim',
     stamp: 'CAPTCHA VICTIM',
-    subtitle: 'You finished all 12 stages, but at what cost to your sanity?',
+    subtitle: 'You finished the gauntlet, but at what cost to your sanity?',
     roast: 'Congratulations! You have survived maximum psychological bureaucracy.',
     accent: 'amber',
     victory: true,
@@ -162,6 +266,144 @@ export const ENDINGS: Record<EndingId, EndingProfile> = {
   },
 };
 
+// Deterministic FNV-1a string hash + Mulberry32 PRNG so the exact same seed reproduces the exact same run
+export function hashSeedString(input: string): number {
+  let h = 2166136261 >>> 0;
+  const normalized = input.trim().toUpperCase() || 'CFH-DEFAULT';
+  for (let i = 0; i < normalized.length; i += 1) {
+    h ^= normalized.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h || 1337;
+}
+
+export function createSeededRng(seed: number): () => number {
+  let a = (Math.abs(Math.floor(seed)) || 1337) >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function generateRandomSeedCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'HELL-';
+  for (let i = 0; i < 4; i += 1) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
+export function getDailySeedCode(date: Date = new Date()): string {
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  return `DAILY-${yyyy}-${mm}-${dd}`;
+}
+
+export function createRunBlueprint(
+  mode: GameMode,
+  rawSeed?: string,
+): RunBlueprint {
+  const seedCode =
+    mode === 'daily'
+      ? rawSeed?.trim() || getDailySeedCode()
+      : rawSeed?.trim().toUpperCase() || generateRandomSeedCode();
+  const numericSeed = hashSeedString(`${mode}:${seedCode}`);
+  const rand = createSeededRng(numericSeed);
+
+  const personalityId =
+    ALL_PERSONALITY_IDS[Math.floor(rand() * ALL_PERSONALITY_IDS.length)];
+  const personality = PERSONALITIES[personalityId];
+
+  // Classic keeps canonical 0..11 order; Chaos, Nightmare, Daily shuffle middle stages while anchoring Stage 12 Boss at the finale
+  let stageIndices = Array.from({ length: TOTAL_LEVELS }, (_, i) => i);
+  if (mode === 'chaos' || mode === 'daily' || mode === 'nightmare') {
+    const corePool = Array.from({ length: TOTAL_LEVELS - 1 }, (_, i) => i);
+    for (let i = corePool.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rand() * (i + 1));
+      [corePool[i], corePool[j]] = [corePool[j], corePool[i]];
+    }
+    stageIndices = [...corePool, TOTAL_LEVELS - 1];
+  } else if (mode === 'endless') {
+    // Initial 12-stage wave deck (waves beyond 12 are generated deterministically via getEndlessStageConfig)
+    stageIndices = Array.from({ length: TOTAL_LEVELS }, (_, i) =>
+      getEndlessStageConfig(numericSeed, i).levelIndex,
+    );
+  }
+
+  const stageModifiers: StageModifier[] = stageIndices.map((_, idx) => {
+    if (mode === 'classic') return STAGE_MODIFIERS.none;
+    if (mode === 'nightmare') {
+      const id = ACTIVE_MODIFIER_POOL[Math.floor(rand() * ACTIVE_MODIFIER_POOL.length)];
+      return STAGE_MODIFIERS[id];
+    }
+    // Chaos, Daily, Endless inject modifiers on ~60% of stages after stage 1
+    if (idx === 0 || rand() < 0.35) return STAGE_MODIFIERS.none;
+    const id = ACTIVE_MODIFIER_POOL[Math.floor(rand() * ACTIVE_MODIFIER_POOL.length)];
+    return STAGE_MODIFIERS[id];
+  });
+
+  const eventSchedule = createRunEventSchedule(numericSeed, mode);
+
+  return {
+    mode,
+    seedCode,
+    numericSeed,
+    maxRetries: mode === 'nightmare' ? NIGHTMARE_RETRIES : MAX_RETRIES,
+    baseChaosOffset: mode === 'nightmare' ? 22 : mode === 'chaos' ? 8 : 0,
+    personality,
+    stageIndices,
+    stageModifiers,
+    eventSchedule,
+  };
+}
+
+export function getEndlessStageConfig(
+  numericSeed: number,
+  waveIndex: number,
+): { levelIndex: number; modifier: StageModifier; isBossWave: boolean } {
+  // Every 6th stage (5, 11, 17...) is a Boss Meltdown!
+  if ((waveIndex + 1) % 6 === 0) {
+    const rand = createSeededRng(numericSeed + waveIndex * 997);
+    const modId =
+      waveIndex >= 11
+        ? ACTIVE_MODIFIER_POOL[Math.floor(rand() * ACTIVE_MODIFIER_POOL.length)]
+        : 'high-voltage';
+    return {
+      levelIndex: TOTAL_LEVELS - 1,
+      modifier: STAGE_MODIFIERS[modId],
+      isBossWave: true,
+    };
+  }
+
+  // Deterministic non-repeating pack shuffle of non-boss levels (0..10)
+  const packNum = Math.floor(waveIndex / 11);
+  const slotInPack = waveIndex % 11;
+  const packRand = createSeededRng(numericSeed + packNum * 7919 + 17);
+  const pool = Array.from({ length: TOTAL_LEVELS - 1 }, (_, i) => i);
+  for (let i = pool.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(packRand() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const modRand = createSeededRng(numericSeed + waveIndex * 313);
+  const modifier =
+    waveIndex === 0 || modRand() < 0.35
+      ? STAGE_MODIFIERS.none
+      : STAGE_MODIFIERS[
+          ACTIVE_MODIFIER_POOL[Math.floor(modRand() * ACTIVE_MODIFIER_POOL.length)]
+        ];
+
+  return {
+    levelIndex: pool[slotInPack],
+    modifier,
+    isBossWave: false,
+  };
+}
+
 export function calculateChaosLevel(
   levelIndex: number,
   failedVerifications: number,
@@ -185,6 +427,11 @@ export function determineEnding(stats: RunStats): EndingProfile {
   if (stats.surrendered) {
     return ENDINGS['captcha-has-won'];
   }
+  if (stats.mode === 'endless') {
+    if (stats.levelsCleared >= 12) return ENDINGS['certified-human'];
+    if (stats.levelsCleared >= 6) return ENDINGS['captcha-victim'];
+    return ENDINGS['definitely-a-robot'];
+  }
   if (!stats.victory) {
     if (stats.levelsCleared >= 6) {
       return ENDINGS['captcha-has-won'];
@@ -200,8 +447,65 @@ export function determineEnding(stats: RunStats): EndingProfile {
   return ENDINGS['captcha-victim'];
 }
 
-export function createRunEventSchedule(seed: number): import('./types').ChaosScheduleEntry[] {
-  const eventTypes: Array<Exclude<import('./types').ChaosEventType, 'cursor-swap'>> = [
+export function calculateHumanityMetrics(stats: RunStats): {
+  score: number;
+  humanityPct: number;
+  rank: string;
+} {
+  const modeMult =
+    stats.mode === 'nightmare'
+      ? 1.5
+      : stats.mode === 'chaos' || stats.mode === 'daily'
+        ? 1.25
+        : stats.mode === 'endless'
+          ? 1.2
+          : 1;
+
+  const basePoints = stats.levelsCleared * 650;
+  const bossBonus = (stats.bossesDefeated ?? (stats.victory ? 1 : 0)) * 900;
+  const secretBonus = (stats.secretsDiscovered?.length ?? 0) * 400;
+  const speedBonus = Math.max(0, 1800 - stats.elapsedSeconds * 8);
+  const mistakePenalty = stats.failedVerifications * 380;
+  const surrenderPenalty = stats.surrendered ? 1500 : 0;
+
+  const score = Math.max(
+    100,
+    Math.round(
+      (basePoints + bossBonus + secretBonus + (stats.victory ? speedBonus : 0) - mistakePenalty - surrenderPenalty) *
+        modeMult,
+    ),
+  );
+
+  let humanityPct = Math.round(
+    (stats.levelsCleared / Math.max(1, stats.totalLevels)) * 78 +
+      (stats.victory ? 20 : 0) -
+      stats.failedVerifications * 6 +
+      (stats.secretsDiscovered?.length ?? 0) * 3 -
+      (stats.surrendered ? 35 : 0),
+  );
+  if (stats.mode === 'endless') {
+    humanityPct = Math.round(
+      Math.min(99, 24 + stats.levelsCleared * 5 - stats.failedVerifications * 4),
+    );
+  }
+  humanityPct = Math.max(4, Math.min(99, humanityPct));
+
+  let rank = 'F — TOASTER';
+  if (humanityPct >= 93 && stats.failedVerifications === 0) rank = 'S+ APEX HUMAN';
+  else if (humanityPct >= 86) rank = 'S CERTIFIED';
+  else if (humanityPct >= 74) rank = 'A ORGANIC';
+  else if (humanityPct >= 60) rank = 'B PLAUSIBLE';
+  else if (humanityPct >= 44) rank = 'C SUSPICIOUS';
+  else if (humanityPct >= 28) rank = 'D CYBORG';
+
+  return { score, humanityPct, rank };
+}
+
+export function createRunEventSchedule(
+  seed: number,
+  mode: GameMode = 'classic',
+): ChaosScheduleEntry[] {
+  const eventTypes: Array<Exclude<ChaosEventType, 'cursor-swap'>> = [
     'admin-message',
     'stuck-99',
     'fake-success',
@@ -209,26 +513,26 @@ export function createRunEventSchedule(seed: number): import('./types').ChaosSch
     'fake-crash',
   ];
 
-  // Deterministic Fisher-Yates shuffle based on run seed so each run varies cleanly
-  let state = Math.abs(Math.floor(seed)) || 1337;
-  const nextRand = () => {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
+  const nextRand = createSeededRng(seed);
 
   for (let i = eventTypes.length - 1; i > 0; i -= 1) {
     const j = Math.floor(nextRand() * (i + 1));
     [eventTypes[i], eventTypes[j]] = [eventTypes[j], eventTypes[i]];
   }
 
-  // Pick 5 non-adjacent trigger stages between Level 3 (idx 2) and Level 11 (idx 10)
-  // Using alternating slots with seed jitter ensures no back-to-back modal fatigue
-  const slotSets = [
-    [2, 4, 6, 8, 10],
-    [1, 3, 5, 8, 10],
-    [2, 4, 7, 9, 10],
-    [1, 4, 6, 8, 10],
-  ];
+  const slotSets =
+    mode === 'nightmare' || mode === 'chaos'
+      ? [
+          [1, 3, 5, 7, 9],
+          [1, 3, 6, 8, 10],
+          [2, 4, 6, 8, 10],
+        ]
+      : [
+          [2, 4, 6, 8, 10],
+          [1, 3, 5, 8, 10],
+          [2, 4, 7, 9, 10],
+          [1, 4, 6, 8, 10],
+        ];
   const slots = slotSets[Math.floor(nextRand() * slotSets.length)];
 
   return slots.map((triggerLevelIdx, idx) => ({
@@ -253,7 +557,99 @@ export function generateCertificateCode(stats: RunStats, endingId: EndingId): st
   return `CFH-${prefixMap[endingId]}-${hash}`;
 }
 
+// Friend Challenge URL encoding / decoding (100% local, zero backend required)
+export function buildChallengeUrl(
+  baseUrl: string,
+  stats: RunStats,
+  ending: EndingProfile,
+  challengerName = 'Your Friend',
+): string {
+  const metrics = calculateHumanityMetrics(stats);
+  const url = new URL(baseUrl);
+  url.search = '';
+  url.searchParams.set('challenge', '1');
+  url.searchParams.set('mode', stats.mode ?? 'classic');
+  url.searchParams.set('seed', stats.seedCode ?? 'HELL-0001');
+  url.searchParams.set('fName', challengerName.slice(0, 24));
+  url.searchParams.set('fTime', String(Math.max(0, Math.round(stats.elapsedSeconds))));
+  url.searchParams.set('fFails', String(Math.max(0, stats.failedVerifications)));
+  url.searchParams.set('fScore', String(stats.score ?? metrics.score));
+  url.searchParams.set('fEnd', ending.id);
+  url.searchParams.set('fStages', String(stats.levelsCleared));
+  return url.toString();
+}
+
+export function parseChallengeFromSearch(search: string): FriendChallenge | null {
+  const params = new URLSearchParams(search);
+  if (params.get('challenge') !== '1') return null;
+  const rawMode = params.get('mode') as GameMode | null;
+  const validModes: GameMode[] = ['classic', 'chaos', 'nightmare', 'daily', 'endless'];
+  const mode: GameMode = rawMode && validModes.includes(rawMode) ? rawMode : 'classic';
+  const seedCode = (params.get('seed') || '').trim().toUpperCase().slice(0, 24);
+  if (!seedCode) return null;
+
+  const rawEnd = params.get('fEnd') as EndingId | null;
+  const endingId: EndingId =
+    rawEnd && ALL_ENDING_IDS.includes(rawEnd) ? rawEnd : 'suspiciously-human';
+
+  return {
+    mode,
+    seedCode,
+    challengerName: (params.get('fName') || 'A Brave Human').trim().slice(0, 24),
+    elapsedSeconds: Math.max(0, Number(params.get('fTime')) || 0),
+    failedVerifications: Math.max(0, Number(params.get('fFails')) || 0),
+    score: Math.max(0, Number(params.get('fScore')) || 0),
+    endingId,
+    levelsCleared: Math.max(0, Number(params.get('fStages')) || 0),
+  };
+}
+
+export function compareChallengeResults(
+  playerStats: RunStats,
+  friend: FriendChallenge,
+): {
+  winner: 'player' | 'friend' | 'tie';
+  headline: string;
+  playerScore: number;
+  timeDeltaSec: number;
+  failDelta: number;
+} {
+  const playerMetrics = calculateHumanityMetrics(playerStats);
+  const playerScore = playerStats.score ?? playerMetrics.score;
+  const timeDeltaSec = playerStats.elapsedSeconds - friend.elapsedSeconds;
+  const failDelta = playerStats.failedVerifications - friend.failedVerifications;
+
+  if (playerScore > friend.score) {
+    return {
+      winner: 'player',
+      headline: `You beat ${friend.challengerName} by ${playerScore - friend.score} pts! Officially more human.`,
+      playerScore,
+      timeDeltaSec,
+      failDelta,
+    };
+  }
+  if (playerScore < friend.score) {
+    return {
+      winner: 'friend',
+      headline: `${friend.challengerName} still leads by ${friend.score - playerScore} pts. Demand a rematch.`,
+      playerScore,
+      timeDeltaSec,
+      failDelta,
+    };
+  }
+  return {
+    winner: 'tie',
+    headline: `Dead heat with ${friend.challengerName}! Identical humanity signatures.`,
+    playerScore,
+    timeDeltaSec,
+    failDelta,
+  };
+}
+
 const ENDINGS_STORAGE_KEY = 'captcha_from_hell_endings_v1';
+const TUTORIAL_STORAGE_KEY = 'captcha_from_hell_tutorial_done_v1';
+const DAILY_BEST_STORAGE_KEY = 'captcha_from_hell_daily_best_v1';
+const ENDLESS_BEST_STORAGE_KEY = 'captcha_from_hell_endless_best_v1';
 
 export const ALL_ENDING_IDS: EndingId[] = [
   'certified-human',
@@ -290,6 +686,74 @@ export function recordUnlockedEnding(endingId: EndingId): EndingId[] {
     }
   }
   return updated;
+}
+
+export function hasCompletedTutorial(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(TUTORIAL_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markTutorialCompleted(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(TUTORIAL_STORAGE_KEY, '1');
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function loadDailyBest(seedCode: string): { score: number; elapsedSeconds: number } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(DAILY_BEST_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, { score: number; elapsedSeconds: number }>;
+    return parsed[seedCode] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function recordDailyBest(seedCode: string, score: number, elapsedSeconds: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage.getItem(DAILY_BEST_STORAGE_KEY);
+    const parsed: Record<string, { score: number; elapsedSeconds: number }> = raw
+      ? JSON.parse(raw)
+      : {};
+    const prev = parsed[seedCode];
+    if (!prev || score > prev.score) {
+      parsed[seedCode] = { score, elapsedSeconds };
+      window.localStorage.setItem(DAILY_BEST_STORAGE_KEY, JSON.stringify(parsed));
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function loadEndlessBest(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    return Math.max(0, Number(window.localStorage.getItem(ENDLESS_BEST_STORAGE_KEY)) || 0);
+  } catch {
+    return 0;
+  }
+}
+
+export function recordEndlessBest(stagesCleared: number): number {
+  const best = Math.max(loadEndlessBest(), stagesCleared);
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(ENDLESS_BEST_STORAGE_KEY, String(best));
+    } catch {
+      // Ignore storage errors
+    }
+  }
+  return best;
 }
 
 export function evaluateGridSelection(
@@ -426,14 +890,27 @@ export function pickSnarkyMessage(
   return candidates[idx];
 }
 
-export function buildShareText(stats: RunStats, ending: EndingProfile): string {
+export function buildShareText(
+  stats: RunStats,
+  ending: EndingProfile,
+  challengeUrl?: string,
+): string {
   const timeStr = formatDuration(stats.elapsedSeconds);
   const cert = generateCertificateCode(stats, ending.id);
-  return [
-    `CAPTCHA FROM HELL [${cert}] — Verdict: ${ending.title.toUpperCase()}`,
-    `Cleared: ${stats.levelsCleared}/${stats.totalLevels} | Attempts: ${stats.attempts} | Failed: ${stats.failedVerifications}`,
-    `Time: ${timeStr} | Peak Chaos: ${stats.finalChaos}%`,
+  const metrics = calculateHumanityMetrics(stats);
+  const humanityPct = stats.humanityPct ?? metrics.humanityPct;
+  const rank = stats.rank ?? metrics.rank;
+  const modeLabel = (stats.mode ?? 'classic').toUpperCase();
+  const lead = stats.victory
+    ? `I survived CAPTCHA FROM HELL (${modeLabel}). Apparently I'm ${humanityPct}% human (${rank}). Beat that.`
+    : `CAPTCHA FROM HELL (${modeLabel}) just revoked my humanity (${humanityPct}% human · ${ending.title}).`;
+
+  const lines = [
+    lead,
+    `Verdict: ${ending.title.toUpperCase()} [${cert}] | Seed: ${stats.seedCode ?? 'CLASSIC'}`,
+    `Cleared: ${stats.levelsCleared}/${stats.mode === 'endless' ? '∞' : stats.totalLevels} | Mistakes: ${stats.failedVerifications} | Time: ${timeStr} | Peak Chaos: ${stats.finalChaos}%`,
     `"${ending.roast}"`,
-    `TRY THIS. I DARE YOU.`,
-  ].join('\n');
+    challengeUrl ? `Beat my exact seed: ${challengeUrl}` : `TRY THIS. I DARE YOU.`,
+  ];
+  return lines.join('\n');
 }

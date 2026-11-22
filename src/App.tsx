@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshCw, ShieldAlert } from 'lucide-react';
+import { ArrowRight, CheckCircle2, RefreshCw, ShieldAlert } from 'lucide-react';
 import { ChaosEventOverlay } from './components/ChaosEventOverlay';
 import { GameHud } from './components/GameHud';
+import { LoadingScreen } from './components/LoadingScreen';
+import { ModeSelectScreen } from './components/ModeSelectScreen';
+import { OnboardingTutorial } from './components/OnboardingTutorial';
 import { PauseModal } from './components/PauseModal';
 import { ResultScreen } from './components/ResultScreen';
 import { TitleScreen } from './components/TitleScreen';
@@ -20,18 +23,36 @@ import { Level12FinalBoss } from './components/levels/Level12FinalBoss';
 import { CAPTCHA_IMAGES } from './game/assets';
 import {
   LEVEL_METAS,
-  MAX_RETRIES,
   TOTAL_LEVELS,
   calculateChaosLevel,
-  createRunEventSchedule,
-  pickSnarkyMessage,
+  calculateHumanityMetrics,
+  createRunBlueprint,
+  getEndlessStageConfig,
+  markTutorialCompleted,
+  parseChallengeFromSearch,
+  recordDailyBest,
+  recordEndlessBest,
 } from './game/engine';
+import {
+  getSystemStatusNotice,
+  maybePickUnsettlingLine,
+  pickAdminNotice,
+} from './game/narrative';
+import {
+  createInitialRunMemory,
+  pickPersonalityDialogue,
+} from './game/personality';
 import type {
   ChaosEventState,
   ChaosScheduleEntry,
+  FriendChallenge,
+  GameMode,
   GamePhase,
   LevelComponentProps,
+  RunBlueprint,
+  RunMemory,
   RunStats,
+  StageModifier,
 } from './game/types';
 import { sound } from './utils/sound';
 
@@ -87,19 +108,43 @@ function getInitialAutoStart(): boolean {
   return params.get('autostart') === '1';
 }
 
+function getInitialFriendChallenge(): FriendChallenge | null {
+  if (typeof window === 'undefined') return null;
+  return parseChallengeFromSearch(window.location.search);
+}
+
+interface StageClearedState {
+  clearedStageNumber: number;
+  clearedTitle: string;
+  feedback: string;
+  isUnsettling: boolean;
+  nextStageIdx: number;
+  isFinalVictory: boolean;
+  nextAttempts: number;
+  nextBosses: number;
+}
+
 export default function App() {
+  const initialAutoStart = useMemo(() => getInitialAutoStart(), []);
+  const [incomingChallenge, setIncomingChallenge] = useState<FriendChallenge | null>(
+    () => getInitialFriendChallenge(),
+  );
+  const [activeChallenge, setActiveChallenge] = useState<FriendChallenge | null>(null);
+
+  const [blueprint, setBlueprint] = useState<RunBlueprint>(() =>
+    createRunBlueprint('classic'),
+  );
   const [phase, setPhase] = useState<GamePhase>(() =>
-    getInitialAutoStart() ? 'playing' : 'title',
+    initialAutoStart ? 'playing' : 'title',
   );
-  const [runSeed, setRunSeed] = useState<number>(() => Date.now());
-  const [eventSchedule, setEventSchedule] = useState<ChaosScheduleEntry[]>(() =>
-    createRunEventSchedule(Date.now()),
-  );
-  const [levelIdx, setLevelIdx] = useState(0);
-  const [retriesLeft, setRetriesLeft] = useState(MAX_RETRIES);
+
+  // stageIdx is 0-based progression step in current run (0..11 in standard modes, 0..∞ in endless)
+  const [stageIdx, setStageIdx] = useState(0);
+  const [retriesLeft, setRetriesLeft] = useState(blueprint.maxRetries);
   const [attempts, setAttempts] = useState(0);
   const [levelAttempts, setLevelAttempts] = useState(0);
   const [failedVerifications, setFailedVerifications] = useState(0);
+  const [bossesDefeated, setBossesDefeated] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [chaosBonus, setChaosBonus] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -117,11 +162,21 @@ export default function App() {
   const [shuffleSeed, setShuffleSeed] = useState(0);
   const [activeChaosEvent, setActiveChaosEvent] = useState<ChaosEventState | null>(null);
   const [cursorOverride, setCursorOverride] = useState<'none' | 'duck' | 'warn'>('none');
+  const [anomaliesFound, setAnomaliesFound] = useState(0);
+  const [stageResetKey, setStageResetKey] = useState(0);
+  const [stagesClearedCount, setStagesClearedCount] = useState(0);
+  const [stageCleared, setStageCleared] = useState<StageClearedState | null>(null);
   const [finalStats, setFinalStats] = useState<RunStats | null>(null);
 
   const levelStartTimeRef = useRef<number>(Date.now());
-  const lastSnarkRef = useRef<string>('');
+  const elapsedSecondsRef = useRef<number>(0);
+  elapsedSecondsRef.current = elapsedSeconds;
+  const runMemoryRef = useRef<RunMemory>(createInitialRunMemory());
+  const lastDialogueRef = useRef<string>('');
   const pendingTimersRef = useRef<number[]>([]);
+  const stageClearedRef = useRef<StageClearedState | null>(null);
+  stageClearedRef.current = stageCleared;
+  const pendingLossRef = useRef<boolean>(false);
 
   const clearPendingTimers = useCallback(() => {
     pendingTimersRef.current.forEach((id) => window.clearTimeout(id));
@@ -147,10 +202,47 @@ export default function App() {
     return clearPendingTimers;
   }, [clearPendingTimers]);
 
-  const chaosLevel = useMemo(
-    () => calculateChaosLevel(levelIdx, failedVerifications, chaosBonus),
-    [levelIdx, failedVerifications, chaosBonus],
-  );
+  // Active stage configuration resolved from blueprint (supports all 5 modes including Endless waves)
+  const activeStageConfig = useMemo<{
+    levelIndex: number;
+    modifier: StageModifier;
+    isBossWave: boolean;
+  }>(() => {
+    if (blueprint.mode === 'endless') {
+      return getEndlessStageConfig(blueprint.numericSeed, stageIdx);
+    }
+    const clampedIdx = Math.min(blueprint.stageIndices.length - 1, stageIdx);
+    const levelIndex = blueprint.stageIndices[clampedIdx] ?? 0;
+    const modifier = blueprint.stageModifiers[clampedIdx] ?? {
+      id: 'none',
+      label: 'Standard Audit',
+      description: '',
+    };
+    return {
+      levelIndex,
+      modifier,
+      isBossWave: levelIndex === TOTAL_LEVELS - 1,
+    };
+  }, [blueprint, stageIdx]);
+
+  const chaosLevel = useMemo(() => {
+    const modifierBonus =
+      activeStageConfig.modifier.id === 'paranoid-audit' ? 8 : 0;
+    const endlessClimb =
+      blueprint.mode === 'endless' ? Math.min(35, stageIdx * 3) : 0;
+    return calculateChaosLevel(
+      Math.min(TOTAL_LEVELS - 1, stageIdx),
+      failedVerifications,
+      blueprint.baseChaosOffset + chaosBonus + modifierBonus + endlessClimb,
+    );
+  }, [
+    activeStageConfig.modifier.id,
+    blueprint.baseChaosOffset,
+    blueprint.mode,
+    chaosBonus,
+    failedVerifications,
+    stageIdx,
+  ]);
 
   // Mirror state machine to document.body.dataset.state & sync Web Audio pause state
   useEffect(() => {
@@ -158,43 +250,147 @@ export default function App() {
     sound.setPaused(phase === 'paused');
   }, [phase]);
 
-  // Run timer during active play
+  // Run timer during active puzzle play (paused while viewing Stage Cleared feedback)
   useEffect(() => {
-    if (phase !== 'playing') return;
+    if (phase !== 'playing' || stageCleared !== null) return;
     const timer = window.setInterval(() => {
       setElapsedSeconds((s) => s + 1);
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [phase]);
+  }, [phase, stageCleared]);
 
-  const startFreshRun = useCallback(() => {
+  const launchRun = useCallback(
+    (
+      mode: GameMode,
+      customSeed?: string,
+      opts?: {
+        skipLoading?: boolean;
+        challenge?: FriendChallenge | null;
+        startStageIdx?: number;
+      },
+    ) => {
+      clearPendingTimers();
+      pendingLossRef.current = false;
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      const nextBlueprint = createRunBlueprint(mode, customSeed);
+      const nextMemory = createInitialRunMemory();
+      runMemoryRef.current = nextMemory;
+      const clampedStart = Math.max(
+        0,
+        Math.min(TOTAL_LEVELS - 1, opts?.startStageIdx ?? 0),
+      );
+      setBlueprint(nextBlueprint);
+      setActiveChallenge(opts?.challenge ?? null);
+
+      setStageIdx(clampedStart);
+      setRetriesLeft(nextBlueprint.maxRetries);
+      setAttempts(0);
+      setLevelAttempts(0);
+      setFailedVerifications(0);
+      setBossesDefeated(0);
+      setElapsedSeconds(0);
+      setChaosBonus(0);
+      setShuffleSeed(
+        nextBlueprint.stageModifiers[clampedStart]?.id === 'scrambled-grid' ? 1 : 0,
+      );
+      setShaking(false);
+      setCardFlash('none');
+      setActiveChaosEvent(null);
+      setCursorOverride('none');
+      setAnomaliesFound(0);
+      setStageResetKey((k) => k + 1);
+      setStagesClearedCount(0);
+      setStageCleared(null);
+      setFinalStats(null);
+      levelStartTimeRef.current = Date.now();
+
+      const openingLine = pickPersonalityDialogue({
+        personalityId: nextBlueprint.personality.id,
+        event: 'opening',
+        memory: nextMemory,
+        stageNumber: clampedStart + 1,
+        mode,
+        lastMessage: '',
+        seed: nextBlueprint.numericSeed,
+      });
+      lastDialogueRef.current = openingLine;
+      setSystemFeedback({ tone: 'neutral', text: openingLine });
+      setPhase(opts?.skipLoading ? 'playing' : 'loading');
+    },
+    [clearPendingTimers],
+  );
+
+  const handleRestartCurrentRun = useCallback(() => {
+    // Restart same mode (if in a friend challenge, keep exact challenge seed!)
+    launchRun(
+      blueprint.mode,
+      activeChallenge
+        ? activeChallenge.seedCode
+        : blueprint.mode === 'daily'
+          ? blueprint.seedCode
+          : undefined,
+      { skipLoading: true, challenge: activeChallenge },
+    );
+  }, [activeChallenge, blueprint.mode, blueprint.seedCode, launchRun]);
+
+  const handleBackToSelect = useCallback(() => {
     clearPendingTimers();
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    const nextSeed = Date.now() + Math.floor(Math.random() * 10000);
-    setRunSeed(nextSeed);
-    setEventSchedule(createRunEventSchedule(nextSeed));
-    setPhase('playing');
-    setLevelIdx(0);
-    setRetriesLeft(MAX_RETRIES);
-    setAttempts(0);
-    setLevelAttempts(0);
-    setFailedVerifications(0);
-    setElapsedSeconds(0);
-    setChaosBonus(0);
-    setShuffleSeed(0);
-    setShaking(false);
-    setCardFlash('none');
+    pendingLossRef.current = false;
+    sound.pauseToggle(false);
+    sound.click();
+    setStageCleared(null);
     setActiveChaosEvent(null);
     setCursorOverride('none');
-    setFinalStats(null);
-    levelStartTimeRef.current = Date.now();
-    setSystemFeedback({
-      tone: 'neutral',
-      text: 'Security checkpoint active. Prove you are made of meat.',
-    });
+    setPhase('modes');
   }, [clearPendingTimers]);
+
+  const handleJumpToStage = useCallback(
+    (targetIdx: number) => {
+      if (blueprint.mode !== 'classic') return;
+      const clamped = Math.max(0, Math.min(TOTAL_LEVELS - 1, targetIdx));
+      clearPendingTimers();
+      pendingLossRef.current = false;
+      sound.click();
+      setStageCleared(null);
+      setActiveChaosEvent(null);
+      setCursorOverride('none');
+      setShaking(false);
+      setCardFlash('none');
+      setStageIdx(clamped);
+      setStageResetKey((k) => k + 1);
+      setLevelAttempts(0);
+      setShuffleSeed(
+        blueprint.stageModifiers[clamped]?.id === 'scrambled-grid' ? 1 : 0,
+      );
+      levelStartTimeRef.current = Date.now();
+      const targetMeta = LEVEL_METAS[blueprint.stageIndices[clamped] ?? clamped];
+      setSystemFeedback({
+        tone: 'neutral',
+        text: `Loaded Level ${clamped + 1}: ${targetMeta.title}.`,
+      });
+      setPhase('playing');
+    },
+    [blueprint.mode, blueprint.stageIndices, blueprint.stageModifiers, clearPendingTimers],
+  );
+
+  const handleLandingPlayNow = useCallback(() => {
+    setPhase('modes');
+  }, []);
+
+  const handleTutorialFinish = useCallback(() => {
+    markTutorialCompleted();
+    setPhase('modes');
+  }, []);
+
+  const handleAcceptChallenge = useCallback(
+    (challenge: FriendChallenge) => {
+      markTutorialCompleted();
+      launchRun(challenge.mode, challenge.seedCode, { challenge });
+    },
+    [launchRun],
+  );
 
   const triggerCursorChaos = useCallback(
     (variant: 'duck' | 'warn') => {
@@ -207,9 +403,16 @@ export default function App() {
   );
 
   const triggerScheduledChaosEvent = useCallback(
-    (entry: ChaosScheduleEntry) => {
-      const template = CHAOS_EVENT_TEMPLATES[entry.type];
+    (entry: ChaosScheduleEntry, targetStageNumber: number) => {
+      const template =
+        entry.type === 'admin-message'
+          ? {
+              type: 'admin-message' as const,
+              ...pickAdminNotice(blueprint.numericSeed, targetStageNumber),
+            }
+          : CHAOS_EVENT_TEMPLATES[entry.type];
       sound.glitch();
+      runMemoryRef.current.chaosEventsSurvived += 1;
       setActiveChaosEvent({
         ...template,
         id: `${entry.type}-${Date.now()}`,
@@ -218,7 +421,7 @@ export default function App() {
         triggerCursorChaos(entry.cursorVariant);
       }
     },
-    [triggerCursorChaos],
+    [blueprint.numericSeed, triggerCursorChaos],
   );
 
   const triggerCardFlash = useCallback(
@@ -229,10 +432,17 @@ export default function App() {
     [scheduleTimeout],
   );
 
-  // Keyboard shortcuts (Enter/Space on Title, Esc/P pause, M mute, R restart)
+  // Keyboard shortcuts
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
+      const isInteractiveTarget =
+        target &&
+        (target.tagName === 'BUTTON' ||
+          target.tagName === 'A' ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable);
       const isTyping =
         target &&
         (target.tagName === 'INPUT' ||
@@ -240,10 +450,14 @@ export default function App() {
           target.isContentEditable);
 
       if (phase === 'title') {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if ((e.key === 'Enter' || e.key === ' ') && !isInteractiveTarget) {
           e.preventDefault();
           sound.click();
-          startFreshRun();
+          if (incomingChallenge) {
+            handleAcceptChallenge(incomingChallenge);
+          } else {
+            handleLandingPlayNow();
+          }
         }
         return;
       }
@@ -252,6 +466,7 @@ export default function App() {
         if (e.key === 'Escape' && phase === 'playing') {
           e.preventDefault();
           sound.pauseToggle(true);
+          runMemoryRef.current.timesPaused += 1;
           setPhase('paused');
         }
         return;
@@ -261,6 +476,7 @@ export default function App() {
         if (phase === 'playing') {
           e.preventDefault();
           sound.pauseToggle(true);
+          runMemoryRef.current.timesPaused += 1;
           setPhase('paused');
         } else if (phase === 'paused') {
           e.preventDefault();
@@ -274,13 +490,19 @@ export default function App() {
       } else if (e.key.toLowerCase() === 'r' && (phase === 'playing' || phase === 'paused')) {
         e.preventDefault();
         sound.click();
-        startFreshRun();
+        handleRestartCurrentRun();
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [phase, startFreshRun]);
+  }, [
+    handleAcceptChallenge,
+    handleLandingPlayNow,
+    handleRestartCurrentRun,
+    incomingChallenge,
+    phase,
+  ]);
 
   const finishGame = useCallback(
     (opts: {
@@ -289,92 +511,203 @@ export default function App() {
       clearedCount: number;
       finalFails: number;
       totalAttempts: number;
+      finalBossesDefeated: number;
     }) => {
       clearPendingTimers();
-      const snapshot: RunStats = {
+      const baseSnapshot: RunStats = {
         levelsCleared: opts.clearedCount,
-        totalLevels: TOTAL_LEVELS,
+        totalLevels: blueprint.mode === 'endless' ? Math.max(12, opts.clearedCount) : TOTAL_LEVELS,
         attempts: opts.totalAttempts,
         failedVerifications: opts.finalFails,
-        elapsedSeconds,
+        elapsedSeconds: elapsedSecondsRef.current,
         finalChaos: calculateChaosLevel(
           Math.min(TOTAL_LEVELS - 1, opts.clearedCount),
           opts.finalFails,
-          chaosBonus,
+          blueprint.baseChaosOffset + chaosBonus,
         ),
         surrendered: Boolean(opts.surrendered),
         victory: opts.victory,
+        mode: blueprint.mode,
+        seedCode: blueprint.seedCode,
+        personalityId: blueprint.personality.id,
+        bossesDefeated: opts.finalBossesDefeated,
+        secretsDiscovered: [...runMemoryRef.current.secretsFound],
       };
+
+      const metrics = calculateHumanityMetrics(baseSnapshot);
+      const snapshot: RunStats = {
+        ...baseSnapshot,
+        score: metrics.score,
+        humanityPct: metrics.humanityPct,
+        rank: metrics.rank,
+      };
+
+      if (blueprint.mode === 'daily') {
+        recordDailyBest(blueprint.seedCode, metrics.score, snapshot.elapsedSeconds);
+      } else if (blueprint.mode === 'endless') {
+        recordEndlessBest(opts.clearedCount);
+      }
+
       setFinalStats(snapshot);
       setActiveChaosEvent(null);
       setCursorOverride('none');
-      if (opts.victory) {
+      if (opts.victory || (blueprint.mode === 'endless' && opts.clearedCount >= 6)) {
         sound.victoryFanfare();
       } else {
         sound.defeatSting();
       }
       setPhase('gameover');
     },
-    [chaosBonus, clearPendingTimers, elapsedSeconds],
+    [blueprint, chaosBonus, clearPendingTimers],
   );
 
   const handleLevelSuccess = useCallback(
-    (customNote?: string) => {
+    (customNote?: string, secretId?: string) => {
+      if (stageClearedRef.current || pendingLossRef.current) return;
       sound.success();
       triggerCardFlash('success');
       const nextAttempts = attempts + 1;
       setAttempts(nextAttempts);
 
       const levelElapsedMs = Date.now() - levelStartTimeRef.current;
-      const nextIdx = levelIdx + 1;
-
-      if (nextIdx >= TOTAL_LEVELS) {
-        finishGame({
-          victory: true,
-          clearedCount: TOTAL_LEVELS,
-          finalFails: failedVerifications,
-          totalAttempts: nextAttempts,
-        });
-        return;
+      const mem = runMemoryRef.current;
+      mem.cleanStreak += 1;
+      if (levelElapsedMs < 3500) mem.fastClears += 1;
+      if (secretId && !mem.secretsFound.includes(secretId)) {
+        mem.secretsFound.push(secretId);
+        setAnomaliesFound(mem.secretsFound.length);
       }
+
+      const clearedBoss = activeStageConfig.isBossWave;
+      const nextBosses = clearedBoss ? bossesDefeated + 1 : bossesDefeated;
+      if (clearedBoss) {
+        setBossesDefeated(nextBosses);
+      }
+
+      const nextStageIdx = stageIdx + 1;
+      setStagesClearedCount((c) => c + 1);
+      const isFinalVictory =
+        blueprint.mode !== 'endless' && nextStageIdx >= TOTAL_LEVELS;
+
+      // Endless boss clear reward: +1 retry (capped at blueprint.maxRetries)
+      if (blueprint.mode === 'endless' && clearedBoss) {
+        setRetriesLeft((r) => Math.min(blueprint.maxRetries, r + 1));
+      }
+
+      const nextIsBoss = !isFinalVictory
+        ? blueprint.mode === 'endless'
+          ? getEndlessStageConfig(blueprint.numericSeed, nextStageIdx).isBossWave
+          : blueprint.stageIndices[nextStageIdx] === TOTAL_LEVELS - 1
+        : false;
+
+      const dialogueEvent = secretId
+        ? 'secret'
+        : nextIsBoss
+          ? 'boss-intro'
+          : levelElapsedMs < 3500
+            ? 'fast'
+            : 'pass';
+
+      const personalityLine = pickPersonalityDialogue({
+        personalityId: blueprint.personality.id,
+        event: dialogueEvent,
+        memory: mem,
+        stageNumber: nextStageIdx + 1,
+        mode: blueprint.mode,
+        lastMessage: lastDialogueRef.current,
+      });
+
+      const unsettlingLine =
+        !secretId && !nextIsBoss && !isFinalVictory
+          ? maybePickUnsettlingLine({
+              stageNumber: nextStageIdx + 1,
+              numericSeed: blueprint.numericSeed,
+              memory: mem,
+              lastMessage: lastDialogueRef.current,
+            })
+          : null;
 
       const feedbackMsg =
-        customNote ||
-        pickSnarkyMessage(
-          {
-            kind: levelElapsedMs < 3500 ? 'fast' : 'pass',
-            levelId: levelIdx + 1,
-            failedCount: failedVerifications,
-          },
-          lastSnarkRef.current,
-        );
-      lastSnarkRef.current = feedbackMsg;
+        unsettlingLine ??
+        (secretId || nextIsBoss || !customNote ? personalityLine : customNote);
+      lastDialogueRef.current = feedbackMsg;
 
-      setSystemFeedback({ tone: 'success', text: feedbackMsg });
-      setLevelIdx(nextIdx);
-      setLevelAttempts(0);
-      setShuffleSeed(0);
-      levelStartTimeRef.current = Date.now();
-
-      // Check randomized run chaos schedule for this stage transition
-      const scheduled = eventSchedule.find((ev) => ev.triggerLevelIdx === nextIdx);
-      if (scheduled) {
-        triggerScheduledChaosEvent(scheduled);
-      }
+      const clearedMeta = LEVEL_METAS[activeStageConfig.levelIndex];
+      setSystemFeedback({
+        tone: unsettlingLine ? 'neutral' : 'success',
+        text: feedbackMsg,
+      });
+      setStageCleared({
+        clearedStageNumber: stageIdx + 1,
+        clearedTitle: clearedMeta.title,
+        feedback: feedbackMsg,
+        isUnsettling: Boolean(unsettlingLine),
+        nextStageIdx,
+        isFinalVictory,
+        nextAttempts,
+        nextBosses,
+      });
     },
     [
+      activeStageConfig.isBossWave,
+      activeStageConfig.levelIndex,
       attempts,
-      eventSchedule,
-      failedVerifications,
-      finishGame,
-      levelIdx,
+      blueprint,
+      bossesDefeated,
+      stageIdx,
       triggerCardFlash,
-      triggerScheduledChaosEvent,
     ],
   );
 
+  const handleAdvanceFromCleared = useCallback(() => {
+    const cleared = stageClearedRef.current;
+    if (!cleared) return;
+    sound.click();
+
+    if (cleared.isFinalVictory) {
+      setStageCleared(null);
+      finishGame({
+        victory: true,
+        clearedCount: TOTAL_LEVELS,
+        finalFails: failedVerifications,
+        totalAttempts: cleared.nextAttempts,
+        finalBossesDefeated: cleared.nextBosses,
+      });
+      return;
+    }
+
+    const nextMod =
+      blueprint.mode === 'endless'
+        ? getEndlessStageConfig(blueprint.numericSeed, cleared.nextStageIdx).modifier
+        : blueprint.stageModifiers[cleared.nextStageIdx];
+
+    setStageCleared(null);
+    setStageIdx(cleared.nextStageIdx);
+    setLevelAttempts(0);
+    setShuffleSeed(nextMod?.id === 'scrambled-grid' ? 1 : 0);
+    levelStartTimeRef.current = Date.now();
+
+    const scheduleLookupIdx =
+      blueprint.mode === 'endless' ? cleared.nextStageIdx % 11 : cleared.nextStageIdx;
+    const scheduled = blueprint.eventSchedule.find(
+      (ev) => ev.triggerLevelIdx === scheduleLookupIdx,
+    );
+    if (scheduled) {
+      triggerScheduledChaosEvent(scheduled, cleared.nextStageIdx + 1);
+    }
+  }, [
+    blueprint.eventSchedule,
+    blueprint.mode,
+    blueprint.numericSeed,
+    blueprint.stageModifiers,
+    failedVerifications,
+    finishGame,
+    triggerScheduledChaosEvent,
+  ]);
+
   const handleLevelFail = useCallback(
     (reason: string, consumeRetry = true) => {
+      if (stageClearedRef.current || pendingLossRef.current) return;
       sound.wrong();
       triggerCardFlash('error');
       setShaking(true);
@@ -394,40 +727,57 @@ export default function App() {
       setFailedVerifications(nextFails);
       setRetriesLeft(nextRetries);
 
-      const extraSnark = pickSnarkyMessage(
-        { kind: 'fail', levelId: levelIdx + 1, failedCount: nextFails },
-        lastSnarkRef.current,
-      );
-      lastSnarkRef.current = extraSnark;
+      const mem = runMemoryRef.current;
+      mem.mistakeCount = nextFails;
+      mem.cleanStreak = 0;
+
+      const personalityFail = pickPersonalityDialogue({
+        personalityId: blueprint.personality.id,
+        event: nextRetries === 1 ? 'retry-low' : 'fail',
+        memory: mem,
+        stageNumber: stageIdx + 1,
+        mode: blueprint.mode,
+        lastMessage: lastDialogueRef.current,
+      });
+      lastDialogueRef.current = personalityFail;
 
       setSystemFeedback({
         tone: 'error',
-        text: reason || extraSnark,
+        text: reason || personalityFail,
       });
 
-      // On grid levels (L2, L6, L10), shuffle tiles after a fail for extra mischief
-      if (levelIdx === 1 || levelIdx === 5 || levelIdx === 9) {
+      // Shuffle grid levels (L2, L6, L10) on fail for extra mischief
+      const activeLvIdx = activeStageConfig.levelIndex;
+      if (activeLvIdx === 1 || activeLvIdx === 5 || activeLvIdx === 9) {
         setShuffleSeed((s) => s + 1);
       }
 
       if (nextRetries <= 0) {
+        pendingLossRef.current = true;
         scheduleTimeout(() => {
+          pendingLossRef.current = false;
           finishGame({
             victory: false,
-            clearedCount: levelIdx,
+            clearedCount: stagesClearedCount,
             finalFails: nextFails,
             totalAttempts: nextAttempts,
+            finalBossesDefeated: bossesDefeated,
           });
         }, 450);
       }
     },
     [
+      activeStageConfig.levelIndex,
       attempts,
+      blueprint.mode,
+      blueprint.personality.id,
+      bossesDefeated,
       failedVerifications,
       finishGame,
-      levelIdx,
       retriesLeft,
       scheduleTimeout,
+      stageIdx,
+      stagesClearedCount,
       triggerCardFlash,
     ],
   );
@@ -436,21 +786,34 @@ export default function App() {
     finishGame({
       victory: false,
       surrendered: true,
-      clearedCount: levelIdx,
+      clearedCount: stagesClearedCount,
       finalFails: failedVerifications,
       totalAttempts: attempts + 1,
+      finalBossesDefeated: bossesDefeated,
     });
-  }, [attempts, failedVerifications, finishGame, levelIdx]);
+  }, [attempts, bossesDefeated, failedVerifications, finishGame, stagesClearedCount]);
 
   const handleManualShuffle = useCallback(() => {
     sound.glitch();
     setShuffleSeed((s) => s + 1);
     setChaosBonus((b) => b + 2);
-    setSystemFeedback({
-      tone: 'neutral',
-      text: 'Refreshed the CAPTCHA. Wait—it actually got slightly worse.',
+    const mem = runMemoryRef.current;
+    mem.refreshClicks += 1;
+    if (mem.refreshClicks === 3 && !mem.secretsFound.includes('panic-refresh')) {
+      mem.secretsFound.push('panic-refresh');
+      setAnomaliesFound(mem.secretsFound.length);
+    }
+    const line = pickPersonalityDialogue({
+      personalityId: blueprint.personality.id,
+      event: 'refresh',
+      memory: mem,
+      stageNumber: stageIdx + 1,
+      mode: blueprint.mode,
+      lastMessage: lastDialogueRef.current,
     });
-  }, []);
+    lastDialogueRef.current = line;
+    setSystemFeedback({ tone: 'neutral', text: line });
+  }, [blueprint.mode, blueprint.personality.id, stageIdx]);
 
   const handleDismissChaosEvent = useCallback((note?: string) => {
     setActiveChaosEvent(null);
@@ -465,44 +828,118 @@ export default function App() {
 
   const handlePause = useCallback(() => {
     sound.pauseToggle(true);
+    runMemoryRef.current.timesPaused += 1;
     setPhase('paused');
   }, []);
 
   const handleResume = useCallback(() => {
     sound.pauseToggle(false);
+    const line = pickPersonalityDialogue({
+      personalityId: blueprint.personality.id,
+      event: 'pause-return',
+      memory: runMemoryRef.current,
+      stageNumber: stageIdx + 1,
+      mode: blueprint.mode,
+      lastMessage: lastDialogueRef.current,
+    });
+    lastDialogueRef.current = line;
+    setSystemFeedback({ tone: 'neutral', text: line });
     setPhase('playing');
+  }, [blueprint.mode, blueprint.personality.id, stageIdx]);
+
+  const handleChaosSpike = useCallback((amt: number) => {
+    setChaosBonus((b) => b + amt);
   }, []);
 
   if (phase === 'title') {
-    return <TitleScreen onStart={startFreshRun} />;
+    return (
+      <TitleScreen
+        incomingChallenge={incomingChallenge}
+        onPlayNow={handleLandingPlayNow}
+        onHowToPlay={() => setPhase('tutorial')}
+        onAcceptChallenge={handleAcceptChallenge}
+        onDismissChallenge={() => setIncomingChallenge(null)}
+      />
+    );
+  }
+
+  if (phase === 'tutorial') {
+    return (
+      <OnboardingTutorial
+        onComplete={handleTutorialFinish}
+        onSkip={handleTutorialFinish}
+      />
+    );
+  }
+
+  if (phase === 'modes') {
+    return (
+      <ModeSelectScreen
+        onSelectMode={(mode, seed) => launchRun(mode, seed)}
+        onSelectLevel={(levelIndex) =>
+          launchRun('classic', undefined, {
+            startStageIdx: levelIndex,
+            skipLoading: true,
+          })
+        }
+        onBackToTitle={() => setPhase('title')}
+        onOpenTutorial={() => setPhase('tutorial')}
+      />
+    );
+  }
+
+  if (phase === 'loading') {
+    return (
+      <LoadingScreen
+        blueprint={blueprint}
+        onReady={() => {
+          levelStartTimeRef.current = Date.now();
+          setPhase('playing');
+        }}
+      />
+    );
   }
 
   if (phase === 'gameover' && finalStats) {
     return (
       <ResultScreen
         stats={finalStats}
-        onPlayAgain={startFreshRun}
+        friendChallenge={activeChallenge}
+        onPlayAgain={handleRestartCurrentRun}
+        onChangeMode={() => setPhase('modes')}
         onReturnTitle={() => setPhase('title')}
       />
     );
   }
 
-  const currentMeta = LEVEL_METAS[levelIdx];
-  const ActiveLevel = LEVEL_COMPONENTS[levelIdx];
+  const currentMeta = LEVEL_METAS[activeStageConfig.levelIndex];
+  const ActiveLevel = LEVEL_COMPONENTS[activeStageConfig.levelIndex];
+  const activeModifier = activeStageConfig.modifier;
+  const isLevelBlocked =
+    phase === 'paused' ||
+    stageCleared !== null ||
+    (activeChaosEvent !== null && activeChaosEvent.type !== 'admin-message');
 
-  // Progressive 5-tier chaos atmosphere (never hurts readability)
-  const chaosCardFrame =
-    cardFlash === 'success'
-      ? 'border-[#22C55E] shadow-[0_0_32px_rgba(34,197,94,0.22)]'
+  const statusNotice = getSystemStatusNotice({
+    stageNumber: stageIdx + 1,
+    numericSeed: blueprint.numericSeed,
+    chaosLevel,
+    anomaliesFound,
+  });
+
+  const stageTitles =
+    blueprint.mode === 'classic'
+      ? blueprint.stageIndices.map((idx) => LEVEL_METAS[idx]?.title ?? '')
+      : undefined;
+
+  const cardBorderTone =
+    stageCleared !== null || cardFlash === 'success'
+      ? 'border-[#4E8A63]'
       : cardFlash === 'error'
-        ? 'border-[#EF4444] shadow-[0_0_34px_rgba(239,68,68,0.28)]'
-        : chaosLevel >= 90
-          ? 'rotate-[-0.55deg] border-[#DC2626]/80 shadow-[0_24px_64px_rgba(220,38,38,0.2)]'
-          : chaosLevel >= 70
-            ? 'rotate-[0.25deg] border-[#DC2626]/55 shadow-[0_24px_64px_rgba(0,0,0,0.7)]'
-            : chaosLevel >= 45
-              ? 'border-[#991B1B]/60 shadow-[0_24px_64px_rgba(0,0,0,0.68)]'
-              : 'border-[#262B35] shadow-[0_24px_64px_rgba(0,0,0,0.65)]';
+        ? 'border-[#B84B4B]'
+        : statusNotice.anomaly || chaosLevel >= 88
+          ? 'border-[#B84B4B]/65'
+          : 'border-[#333333]';
 
   const cursorClass =
     cursorOverride === 'duck'
@@ -515,108 +952,160 @@ export default function App() {
     <div
       className={`captcha-bg-grid relative flex min-h-screen w-full flex-col justify-between ${cursorClass}`}
     >
-      {/* Progressive peripheral red tension vignette as chaos climbs */}
-      {chaosLevel >= 45 && (
-        <div
-          className="pointer-events-none fixed inset-0 z-10 transition-opacity duration-500"
-          style={{
-            background:
-              'radial-gradient(circle at center, transparent 52%, rgba(220,38,38,0.22) 100%)',
-            opacity: Math.min(1, (chaosLevel - 40) / 60),
-          }}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Subtle CRT scanlines fade in progressively as chaos rises */}
-      {chaosLevel >= 25 && (
-        <div
-          className="crt-scanlines fixed inset-0 z-10"
-          style={{ opacity: Math.min(0.42, (chaosLevel - 20) / 170) }}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Perimeter Game HUD */}
+      {/* Minimal Corporate Verification HUD */}
       <GameHud
-        levelNumber={currentMeta.id}
+        stageNumber={stageIdx + 1}
+        mode={blueprint.mode}
+        seedCode={blueprint.seedCode}
+        personalityName={blueprint.personality.name}
         retriesLeft={retriesLeft}
+        maxRetries={blueprint.maxRetries}
         chaosLevel={chaosLevel}
         elapsedSeconds={elapsedSeconds}
+        statusNotice={statusNotice}
+        anomaliesFound={anomaliesFound}
         muted={muted}
+        canJumpLevels={blueprint.mode === 'classic'}
+        stageTitles={stageTitles}
+        onSelectStage={handleJumpToStage}
+        onBack={handleBackToSelect}
         onToggleMute={handleToggleMute}
         onPause={handlePause}
-        onRestart={startFreshRun}
+        onRestart={handleRestartCurrentRun}
       />
 
-      {/* Primary Center CAPTCHA Verification Widget */}
-      <main className="relative z-20 mx-auto flex w-full max-w-[496px] flex-1 flex-col items-center justify-center px-4 py-3 sm:px-5">
+      {/* Primary Center CAPTCHA Verification Card */}
+      <main className="mx-auto flex w-full max-w-[492px] flex-1 flex-col items-center justify-center px-4 py-4 sm:px-5">
         <div
-          className={`w-full rounded-lg border bg-[#14161A] transition-[transform,border-color,box-shadow] duration-200 ${chaosCardFrame} ${
+          data-active-level={currentMeta.id}
+          className={`w-full rounded-md border bg-[#191919] transition-colors duration-150 ${cardBorderTone} ${
             shaking ? 'animate-shake' : ''
           }`}
         >
-          {/* Sinister CAPTCHA Banner Header */}
-          <div className="rounded-t-lg border-b border-[#252A34] bg-[#1A1D24] px-4 py-3.5">
-            <div className="flex items-center justify-between gap-2 text-[11px] font-mono uppercase tracking-wider text-[#9BA1AE]">
+          {/* Clean Verification Header + Explicit Instruction Box */}
+          <div className="rounded-t-md border-b border-[#333333] bg-[#222222] px-4 py-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-wider text-[#929292]">
               <span>
-                {currentMeta.code} · {currentMeta.mechanic}
+                LEVEL {String(currentMeta.id).padStart(2, '0')} · {currentMeta.code} · {currentMeta.mechanic}
+                {activeModifier.id !== 'none' ? ` · ${activeModifier.label}` : ''}
               </span>
-              {chaosLevel >= 70 && (
-                <span className="inline-flex items-center gap-1 font-semibold text-[#EF4444]">
-                  <ShieldAlert className="h-3.5 w-3.5" />
-                  {chaosLevel >= 90 ? 'Sentient Override' : 'Hostile Mode'}
+              {chaosLevel >= 75 && (
+                <span className="inline-flex items-center gap-1 font-semibold text-[#B84B4B]">
+                  <ShieldAlert className="h-3 w-3" />
+                  {chaosLevel >= 90 ? 'Unscripted Review' : 'Elevated Scrutiny'}
                 </span>
               )}
             </div>
             <h1
-              className={`mt-1 font-display text-xl font-bold tracking-tight text-[#F2F0EB] sm:text-[22px] ${
-                chaosLevel >= 80 ? 'animate-glitch' : ''
+              className={`mt-1 text-lg font-semibold tracking-tight text-[#EEEEEE] sm:text-xl ${
+                statusNotice.anomaly ? 'animate-glitch' : ''
               }`}
             >
               {currentMeta.title}
             </h1>
-            <p className="mt-0.5 text-sm text-[#D1D5DB]">{currentMeta.prompt}</p>
-            <p className="mt-0.5 text-xs text-[#9BA1AE]">{currentMeta.subPrompt}</p>
-          </div>
-
-          {/* Active Level Playfield with crisp entry transition */}
-          <div key={currentMeta.id} className="animate-stage-enter p-4">
-            <ActiveLevel
-              levelMeta={currentMeta}
-              chaosLevel={chaosLevel}
-              levelAttempts={levelAttempts}
-              shuffleSeed={shuffleSeed}
-              runSeed={runSeed}
-              isPaused={phase === 'paused'}
-              onSuccess={handleLevelSuccess}
-              onFail={handleLevelFail}
-              onSurrender={handleSurrender}
-              onChaosSpike={(amt) => setChaosBonus((b) => b + amt)}
-            />
-          </div>
-
-          {/* Widget Footer: Contextual Sarcastic System Feedback + Refresh Gag */}
-          <div className="flex items-center justify-between gap-3 rounded-b-lg border-t border-[#232730] bg-[#101217] px-4 py-2.5">
-            <p
-              role="status"
-              aria-live="polite"
-              className={`text-xs leading-snug transition-colors duration-150 ${
-                systemFeedback.tone === 'error'
-                  ? 'font-medium text-[#FCA5A5]'
-                  : systemFeedback.tone === 'success'
-                    ? 'font-medium text-[#86EFAC]'
-                    : 'text-[#9BA1AE]'
-              }`}
+            <div
+              data-challenge-instruction="true"
+              className="mt-2 rounded border border-[#333333] bg-[#161616] px-3 py-2"
             >
-              {systemFeedback.text}
-            </p>
+              <div className="font-mono text-[10px] uppercase tracking-wider text-[#929292]">
+                Instruction
+              </div>
+              <p className="mt-0.5 text-sm font-medium text-[#EEEEEE]">
+                {currentMeta.prompt}
+              </p>
+              <p className="mt-0.5 text-xs text-[#929292]">{currentMeta.subPrompt}</p>
+            </div>
+          </div>
+
+          {/* Active Level Playfield OR Stage Cleared Feedback Panel */}
+          <div
+            key={`${blueprint.numericSeed}-${stageIdx}-${stageResetKey}`}
+            className="animate-stage-enter p-4"
+          >
+            {stageCleared ? (
+              <div
+                data-stage-cleared="true"
+                role="status"
+                aria-live="polite"
+                className="space-y-4 rounded-md border border-[#4E8A63]/70 bg-[#152019] p-5 text-center"
+              >
+                <CheckCircle2 className="mx-auto h-9 w-9 text-[#89B898]" />
+                <div>
+                  <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-[#89B898]">
+                    Stage {String(stageCleared.clearedStageNumber).padStart(2, '0')} Verified
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold text-[#EEEEEE]">
+                    {stageCleared.clearedTitle} — Passed
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-[#CCCCCC]">
+                    {stageCleared.feedback}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  data-next-stage="true"
+                  autoFocus
+                  onClick={handleAdvanceFromCleared}
+                  className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded bg-[#4E8A63] px-5 py-2.5 text-sm font-semibold text-[#EEEEEE] transition-colors hover:bg-[#417553]"
+                >
+                  {stageCleared.isFinalVictory
+                    ? 'View Final Assessment'
+                    : `Continue to Stage ${String(stageCleared.nextStageIdx + 1).padStart(2, '0')}`}
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className={isLevelBlocked ? 'pointer-events-none opacity-60' : ''}>
+                <ActiveLevel
+                  levelMeta={currentMeta}
+                  chaosLevel={chaosLevel}
+                  levelAttempts={levelAttempts}
+                  shuffleSeed={shuffleSeed}
+                  runSeed={blueprint.numericSeed + stageIdx * 31}
+                  isPaused={isLevelBlocked}
+                  mode={blueprint.mode}
+                  activeModifier={activeModifier}
+                  onSuccess={handleLevelSuccess}
+                  onFail={handleLevelFail}
+                  onSurrender={handleSurrender}
+                  onChaosSpike={handleChaosSpike}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Widget Footer: Examiner Feedback + Refresh */}
+          <div className="flex items-center justify-between gap-3 rounded-b-md border-t border-[#262626] bg-[#151515] px-4 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="font-mono text-[10px] uppercase tracking-wider text-[#777777]">
+                {blueprint.personality.name}
+              </div>
+              <p
+                role="status"
+                aria-live="polite"
+                className={`text-xs leading-snug transition-colors duration-150 ${
+                  stageCleared
+                    ? 'font-medium text-[#89B898]'
+                    : systemFeedback.tone === 'error'
+                      ? 'font-medium text-[#D48A8A]'
+                      : systemFeedback.tone === 'success'
+                        ? 'font-medium text-[#89B898]'
+                        : 'text-[#B5B5B5]'
+                }`}
+              >
+                {stageCleared
+                  ? 'Stage verified. Click Continue above to advance.'
+                  : systemFeedback.text}
+              </p>
+            </div>
             <button
               type="button"
+              disabled={stageCleared !== null}
               onClick={handleManualShuffle}
               aria-label="Refresh CAPTCHA challenge"
               title="Refresh CAPTCHA (might make it worse)"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#262B35] bg-[#161920] text-[#9BA1AE] transition-all duration-150 hover:border-[#EF4444] hover:text-white active:scale-95"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-[#333333] bg-[#222222] text-[#929292] transition-colors hover:border-[#666666] hover:text-[#EEEEEE] disabled:opacity-40 sm:h-9 sm:w-9"
             >
               <RefreshCw className="h-4 w-4" />
             </button>
@@ -625,7 +1114,7 @@ export default function App() {
       </main>
 
       {/* Bottom subtle hint bar */}
-      <div className="relative z-20 pb-3 text-center font-mono text-[11px] text-[#5B6170]">
+      <div className="pb-3 text-center font-mono text-[11px] text-[#666666]">
         Esc Pause · M Mute · R Restart
       </div>
 
@@ -638,13 +1127,18 @@ export default function App() {
       {/* Pause Modal */}
       {phase === 'paused' && (
         <PauseModal
-          levelNumber={currentMeta.id}
+          levelNumber={stageIdx + 1}
+          isEndless={blueprint.mode === 'endless'}
           elapsedSeconds={elapsedSeconds}
           chaosLevel={chaosLevel}
           onResume={handleResume}
-          onRestart={startFreshRun}
+          onRestart={handleRestartCurrentRun}
+          onChangeLevel={handleBackToSelect}
           onTitle={() => {
+            clearPendingTimers();
             sound.pauseToggle(false);
+            setStageCleared(null);
+            setActiveChaosEvent(null);
             setPhase('title');
           }}
         />

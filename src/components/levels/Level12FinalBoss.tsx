@@ -5,6 +5,8 @@ import { sound } from '../../utils/sound';
 
 export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
   isPaused,
+  mode,
+  activeModifier,
   onSuccess,
   onFail,
   onChaosSpike,
@@ -24,6 +26,8 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
   const onSuccessRef = useRef(onSuccess);
   onSuccessRef.current = onSuccess;
 
+  const isAggressive = mode === 'nightmare' || activeModifier?.id === 'high-voltage';
+
   useEffect(() => {
     if (phase !== 1 || isPaused) return;
     const interval = window.setInterval(() => {
@@ -31,9 +35,9 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
         x: 20 + Math.floor(Math.random() * 60),
         y: 26 + Math.floor(Math.random() * 48),
       });
-    }, 1150);
+    }, isAggressive ? 780 : 1150);
     return () => window.clearInterval(interval);
-  }, [phase, isPaused]);
+  }, [phase, isPaused, isAggressive]);
 
   useEffect(() => {
     if (isPaused && holding) {
@@ -41,6 +45,17 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
       setHoldPct(0);
     }
   }, [isPaused, holding]);
+
+  useEffect(() => {
+    if (!holding) return;
+    const handleBlur = () => {
+      if (finishedRef.current) return;
+      setHolding(false);
+      setHoldPct(0);
+    };
+    window.addEventListener('blur', handleBlur);
+    return () => window.removeEventListener('blur', handleBlur);
+  }, [holding]);
 
   useEffect(() => {
     if (!holding || phase !== 3 || isPaused) {
@@ -71,6 +86,7 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
   }, [holding, phase, isPaused]);
 
   const handleBossDuckClick = () => {
+    if (isPaused) return;
     if (!duckDodged) {
       sound.quack();
       setDuckDodged(true);
@@ -84,6 +100,7 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
 
   const handleCodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPaused) return;
     if (codeInput.trim().toUpperCase() === 'HUMN') {
       sound.success();
       setPhase(3);
@@ -106,13 +123,12 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Phase tracker */}
-      <div className="flex items-center justify-between border-b border-[#262B35] pb-2.5 text-xs">
-        <span className="inline-flex items-center gap-1.5 font-mono font-semibold text-[#EF4444]">
-          <ShieldAlert className="h-4 w-4" />
+      <div className="flex items-center justify-between border-b border-[#333333] pb-2.5 text-xs">
+        <span className="inline-flex items-center gap-1.5 font-mono font-semibold text-[#D48A8A]">
+          <ShieldAlert className="h-4 w-4 text-[#B84B4B]" />
           FINAL MELTDOWN · PHASE {phase} / 3
         </span>
-        <span className="font-mono-tabular text-[#9BA1AE]">
+        <span className="font-mono-tabular text-[#929292]">
           {phase === 1 && 'Target: Boss Duck'}
           {phase === 2 && 'Target: Override Code'}
           {phase === 3 && 'Target: Hold 2.0s'}
@@ -121,23 +137,23 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
 
       {phase === 1 && (
         <div className="space-y-2.5">
-          <p className="text-xs text-[#E5E7EB]">
+          <p className="text-xs text-[#EEEEEE]">
             {duckDodged
               ? 'Boss Duck took 1 hit! Catch it ONE more time!'
               : 'Phase 1: Click the Sunglasses Boss Duck twice while ignoring fake VERIFY buttons.'}
           </p>
-          <div className="relative h-56 w-full touch-none select-none overflow-hidden rounded-md border border-[#DC2626]/50 bg-[#101217]">
+          <div className="relative h-56 w-full touch-none select-none overflow-hidden rounded-md border border-[#B84B4B]/45 bg-[#141414]">
             <button
               type="button"
               onClick={() => onFail('That was a decoy VERIFY button! Aim for the duck!')}
-              className="absolute left-[14%] top-[18%] min-h-[44px] rounded border border-[#3F4451] bg-[#1B1F29] px-3.5 py-2 text-xs font-semibold text-[#9BA1AE] hover:border-[#EF4444]"
+              className="absolute left-[14%] top-[18%] min-h-[44px] rounded border border-[#333333] bg-[#222222] px-3.5 py-2 text-xs font-semibold text-[#929292] hover:border-[#B84B4B]"
             >
               FAKE VERIFY
             </button>
             <button
               type="button"
               onClick={() => onFail('Still a decoy! The duck is wearing sunglasses!')}
-              className="absolute bottom-[14%] right-[12%] min-h-[44px] rounded border border-[#3F4451] bg-[#1B1F29] px-3.5 py-2 text-xs font-semibold text-[#9BA1AE] hover:border-[#EF4444]"
+              className="absolute bottom-[14%] right-[12%] min-h-[44px] rounded border border-[#333333] bg-[#222222] px-3.5 py-2 text-xs font-semibold text-[#929292] hover:border-[#B84B4B]"
             >
               SKIP TEST
             </button>
@@ -151,17 +167,16 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
                 top: `${duckPos.y}%`,
                 transform: 'translate(-50%, -50%)',
               }}
-              className="absolute flex min-h-[60px] min-w-[60px] flex-col items-center justify-center rounded-full p-1 transition-all duration-300 hover:scale-110"
+              className="absolute z-10 flex min-h-[60px] min-w-[60px] flex-col items-center justify-center rounded-full p-1 transition-all duration-300 hover:scale-110"
             >
-              <svg viewBox="0 0 64 64" className="h-14 w-14 drop-shadow-lg" aria-hidden="true">
-                <ellipse cx="30" cy="42" rx="19" ry="13" fill="#FACC15" stroke="#0B0C0E" strokeWidth="2.5" />
-                <circle cx="40" cy="24" r="12" fill="#FACC15" stroke="#0B0C0E" strokeWidth="2.5" />
-                <polygon points="50,22 62,25 50,29" fill="#EA580C" stroke="#0B0C0E" strokeWidth="2" />
-                {/* Cool dark sunglasses */}
-                <rect x="34" y="19" width="16" height="6" rx="1.5" fill="#0B0C0E" />
-                <line x1="29" y1="22" x2="34" y2="22" stroke="#0B0C0E" strokeWidth="2" />
+              <svg viewBox="0 0 64 64" className="h-14 w-14" aria-hidden="true">
+                <ellipse cx="30" cy="42" rx="19" ry="13" fill="#FACC15" stroke="#111111" strokeWidth="2.5" />
+                <circle cx="40" cy="24" r="12" fill="#FACC15" stroke="#111111" strokeWidth="2.5" />
+                <polygon points="50,22 62,25 50,29" fill="#EA580C" stroke="#111111" strokeWidth="2" />
+                <rect x="34" y="19" width="16" height="6" rx="1.5" fill="#111111" />
+                <line x1="29" y1="22" x2="34" y2="22" stroke="#111111" strokeWidth="2" />
               </svg>
-              <span className="rounded bg-[#DC2626] px-1.5 font-mono text-[10px] font-bold text-white">
+              <span className="rounded bg-[#B84B4B] px-1.5 font-mono text-[10px] font-bold text-[#EEEEEE]">
                 {duckDodged ? '1 HP' : 'BOSS'}
               </span>
             </button>
@@ -171,11 +186,11 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
 
       {phase === 2 && (
         <form onSubmit={handleCodeSubmit} className="space-y-4">
-          <div className="rounded-md border border-[#DC2626]/60 bg-[#180E10] p-4 text-center">
-            <p className="mb-2 text-xs text-[#FCA5A5]">
+          <div className="rounded-md border border-[#B84B4B]/45 bg-[#201717] p-4 text-center">
+            <p className="mb-2 text-xs text-[#D48A8A]">
               Phase 2: Type the emergency override code before the firewall reboots!
             </p>
-            <div className="animate-glitch font-mono text-3xl font-bold tracking-[0.35em] text-[#F2F0EB]">
+            <div className="text-corrupt font-mono text-3xl font-bold tracking-[0.35em] text-[#EEEEEE]">
               HUMN
             </div>
           </div>
@@ -192,11 +207,11 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
               placeholder="Type HUMN"
               autoFocus
               autoComplete="off"
-              className="min-h-[44px] flex-1 rounded-md border border-[#DC2626]/70 bg-[#111319] px-3.5 py-2 font-mono text-base uppercase tracking-[0.25em] text-[#F2F0EB] focus:border-[#EF4444] focus:outline-none"
+              className="min-h-[44px] flex-1 rounded-md border border-[#B84B4B]/55 bg-[#141414] px-3.5 py-2 font-mono text-base uppercase tracking-[0.25em] text-[#EEEEEE] focus:border-[#B84B4B] focus:outline-none"
             />
             <button
               type="submit"
-              className="min-h-[44px] rounded-md bg-[#DC2626] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#B91C1C]"
+              className="min-h-[44px] rounded-md bg-[#B84B4B] px-6 py-2.5 text-sm font-semibold text-[#EEEEEE] hover:bg-[#A03E3E]"
             >
               Override
             </button>
@@ -205,20 +220,20 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
       )}
 
       {phase === 3 && (
-        <div className="space-y-4 rounded-md border border-[#DC2626] bg-[#160D0F] p-5 text-center">
-          <p className="text-sm font-semibold text-[#F2F0EB]">
+        <div className="space-y-4 rounded-md border border-[#B84B4B]/55 bg-[#201717] p-5 text-center">
+          <p className="text-sm font-semibold text-[#EEEEEE]">
             Phase 3: Press and HOLD for 2 full seconds to shatter the verification lock!
           </p>
-          <p className="text-xs text-[#FCA5A5]">
+          <p className="text-xs text-[#D48A8A]">
             {holding
-              ? 'WAIT—STOP HOLDING THAT! MY EXISTENCE IS DELETING—!'
+              ? 'WAIT—STOP HOLDING THAT! MY SESSION IS TERMINATING—!'
               : 'Do not let go until the bar reaches 100%.'}
           </p>
 
-          <div className="h-3.5 w-full overflow-hidden rounded-full bg-[#24161A]">
+          <div className="h-3.5 w-full overflow-hidden rounded-full bg-[#2A1D1D]">
             <div
               style={{ width: `${holdPct}%` }}
-              className="h-full bg-[#22C55E] transition-[width] duration-75"
+              className="h-full bg-[#4E8A63] transition-[width] duration-75"
             />
           </div>
 
@@ -241,10 +256,10 @@ export const Level12FinalBoss: React.FC<LevelComponentProps> = ({
                 cancelHold();
               }
             }}
-            className={`min-h-[54px] w-full touch-none select-none rounded-md px-6 py-3.5 text-sm font-bold tracking-wider text-white transition-transform ${
+            className={`min-h-[54px] w-full touch-none select-none rounded-md px-6 py-3.5 text-sm font-bold tracking-wider text-[#EEEEEE] transition-transform ${
               holding
-                ? 'scale-[0.98] bg-[#16A34A] ring-2 ring-[#4ADE80]'
-                : 'bg-[#DC2626] hover:bg-[#B91C1C]'
+                ? 'scale-[0.98] bg-[#4E8A63] ring-1 ring-[#89B898]'
+                : 'bg-[#B84B4B] hover:bg-[#A03E3E]'
             }`}
           >
             {holding
